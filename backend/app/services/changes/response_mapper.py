@@ -182,11 +182,56 @@ def attach_response(
         body = "\n\n".join(attached)
         node.body = (node.body + "\n\n" + body).strip() if node.body else body
 
+    _attach_edge_response_docs(graph, paragraphs, paragraph_used)
+
     unmatched = [p.text for idx, p in enumerate(paragraphs) if not paragraph_used[idx]]
     graph.narrative = "\n\n".join(unmatched).strip() if unmatched else response
 
     _propagate_edge_docs(graph)
     return graph
+
+
+def _attach_edge_response_docs(
+    graph: ChangeGraph,
+    paragraphs: list[_Paragraph],
+    paragraph_used: list[bool],
+) -> None:
+    nodes_by_id: dict[str, ChangeNode] = {n.id: n for n in graph.nodes}
+
+    for edge in graph.edges:
+        src = nodes_by_id.get(edge.source)
+        tgt = nodes_by_id.get(edge.target)
+        if not src or not tgt:
+            continue
+
+        src_candidates = _node_candidates(src)
+        tgt_candidates = _node_candidates(tgt)
+        relation_candidates = [edge.kind, edge.label, "import" if edge.kind == "imports" else ""]
+        attached: list[tuple[int, int]] = []
+
+        for idx, paragraph in enumerate(paragraphs):
+            src_score, _ = _score_paragraph(paragraph, src_candidates)
+            tgt_score, _ = _score_paragraph(paragraph, tgt_candidates)
+            relation_score, _ = _score_paragraph(
+                paragraph,
+                [candidate for candidate in relation_candidates if candidate],
+            )
+            if src_score > 0 and tgt_score > 0:
+                attached.append((src_score + tgt_score + relation_score, idx))
+            elif relation_score > 0 and (src_score > 0 or tgt_score > 0):
+                attached.append((src_score + tgt_score + relation_score, idx))
+
+        if not attached:
+            continue
+
+        attached.sort(reverse=True)
+        texts = [paragraphs[idx].text for _, idx in attached[:2]]
+        for _, idx in attached[:2]:
+            paragraph_used[idx] = True
+
+        response_doc = "\n\n".join(texts)
+        addition = f"**AI 응답에서 연결된 설명:**\n\n{response_doc}"
+        edge.body = (edge.body + "\n\n" + addition).strip() if edge.body else addition
 
 
 def _propagate_edge_docs(graph: ChangeGraph) -> None:
@@ -205,6 +250,7 @@ def _propagate_edge_docs(graph: ChangeGraph) -> None:
         verb = {
             "contains": "포함합니다",
             "calls": "참조/호출합니다",
+            "imports": "import합니다",
             "referenced_by": "사용합니다",
             "modifies": "수정합니다",
             "renamed_from": "에서 이름이 바뀌었습니다",

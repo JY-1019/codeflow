@@ -1,95 +1,91 @@
 ---
 name: codeflow-light
 description: |
-  방금 LLM(나 자신 또는 Codex)이 코드를 수정한 직후, 그 수정에 대한 *내 응답
-  텍스트* + *실제 git diff* 를 백엔드에 보내 노드·엣지 그래프로 시각화합니다.
-  백엔드는 LLM을 호출하지 않으며, 응답 단락을 변경된 파일/심볼 노드에 매핑할
-  뿐입니다. 결과는 http://localhost:5174 의 라이트 웹 앱에서 표시됩니다.
-
-  TRIGGER:
-  - 사용자가 "방금 한 변경 보여줘", "변경 그래프", "수정 시각화", "/codeflow-light"
-    이라고 말할 때
-  - 코드를 수정한 응답을 막 마쳤고 그 변경을 그래프로 보여주는 게 자연스러울 때
+  Use this skill after a Codex or Claude Code turn that changes code, or whenever
+  the user asks to show the current change flow, session timeline, branch review,
+  변경 그래프, 수정 시각화, or /codeflow-light. It launches/focuses the local
+  Codeflow Light desktop app, captures the user's latest prompt and assistant
+  response as one implementation/review step, and sends the current git diff to
+  the local backend. No LLM API is called by Codeflow Light.
 ---
 
 # Codeflow Light
 
-`/api/changes`는 두 가지 입력으로 그래프를 만듭니다:
+Codeflow Light is a local desktop app for visualizing one coding conversation as
+a Markdown command and implementation/review flow. Each Codex/Claude
+conversation gets its own desktop window and session history. Each captured turn
+becomes one chronological request group named by capture time. Markdown Branch
+Push/Commit captures are expanded inside that request group into command,
+implementation, review, review-fix, verification, commit, and push/merge nodes.
+Files are not the primary graph nodes; they are shown in the right detail panel
+as raw deleted/added lines for the selected request.
+The step stores:
 
-1. `project_root` — git 저장소 경로 (`$PWD` 또는 사용자가 지정한 경로)
-2. `assistant_response` — *나(LLM)*가 방금 사용자에게 보낸 변경 설명 텍스트
+- `user_prompt`: the user's latest request, shown in the right doc panel when
+  the group is clicked.
+- `assistant_response`: the final response you are about to send.
+- `workflow_runs`: deterministic Markdown Branch Push/Commit command and review
+  loop steps inferred from the captured prompt/response.
+- file diff facts: only the files directly changed by this specific response.
+- deterministic summaries: phase (`implementation`, `review`, `review_fix`,
+  `verification`, or `planning`), implementation summary, review summary, and
+  technical considerations inferred from the prompt/response/diff facts.
 
-백엔드는 LLM 키나 외부 API 호출이 필요 없습니다.
+The app has one primary mode:
 
-## 호출 절차
+- **Session Flow**: request groups laid out left-to-right. Markdown Branch
+  Push/Commit requests expand into Markdown command -> implementation -> review
+  -> review-fix -> verification -> commit -> optional push/merge flow nodes,
+  with the received Markdown shown in the right detail panel.
 
-### 1. 백엔드 헬스 체크
+## Capture Workflow
 
-```bash
-curl -sf http://127.0.0.1:8019/api/health > /dev/null && echo ok || echo down
-```
-
-`down`이면 백그라운드로 띄웁니다.
-
-```bash
-cd ~/workspace/codeflow-light/backend && \
-  (./venv/bin/python main.py > /tmp/codeflow-light-backend.log 2>&1 &)
-```
-
-### 2. 프론트엔드 헬스 체크
-
-```bash
-curl -sf http://127.0.0.1:5174 > /dev/null && echo ok || echo down
-```
-
-`down`이면:
-
-```bash
-cd ~/workspace/codeflow-light/frontend && \
-  (npm run dev > /tmp/codeflow-light-frontend.log 2>&1 &)
-```
-
-### 3. `/api/changes` 호출
-
-내가 직전에 사용자에게 보낸 변경 설명 텍스트를 `assistant_response`에 그대로
-담아 보냅니다. (코드 펜스, 인라인 코드, 단락 구조 그대로 — response_mapper가
-파일명·심볼명을 거기서 추출합니다.)
+After implementing the user's request and composing the final answer, run the
+capture script before sending that final answer.
 
 ```bash
-RESPONSE=$(cat <<'EOF'
-<여기에 사용자에게 보낸 변경 설명 본문을 그대로 붙여넣기>
-EOF
-)
-
-curl -s -X POST http://127.0.0.1:8019/api/changes \
-  -H "Content-Type: application/json" \
-  -d "$(jq -n --arg root "$PWD" --arg resp "$RESPONSE" '{project_root: $root, source: "working", assistant_response: $resp}')"
+SCRIPT="$HOME/.codex/skills/codeflow-light/scripts/codeflow_light_capture.py"
+[ -f "$SCRIPT" ] || SCRIPT="$HOME/.claude/skills/codeflow-light/scripts/codeflow_light_capture.py"
+python3 "$SCRIPT" --project-root "$PWD" <<'JSON'
+{
+  "user_prompt": "<copy the user's latest request>",
+  "assistant_response": "<copy the final answer you are about to send>",
+  "source": "branch"
+}
+JSON
 ```
 
-`jq`가 없다면 Python 한 줄로 안전하게 JSON 인코딩하세요.
+The script will:
 
-### 4. 사용자에게 안내
+1. Install missing frontend dependencies if needed.
+2. Build the renderer if the build is missing or stale.
+3. Launch/focus the Electron desktop app.
+4. Wait for the local FastAPI backend.
+5. POST to `/api/sessions/capture`.
 
-응답을 분석한 뒤 이런 형식으로 안내합니다.
+Use `CODEFLOW_LIGHT_SESSION_ID` when the caller provides a stable conversation
+or task id. In Codex Desktop, the capture script automatically falls back to
+`CODEX_THREAD_ID`, so parallel conversations open separate Codeflow windows and
+each window shows only that conversation's groups. If no conversation id is
+available, the app falls back to repository + branch grouping.
 
-```
-변경 그래프: http://localhost:5174
-project_root: <위 경로> · 변경된 파일: N개 · 엣지: M개
-(브라우저에서 같은 경로 입력 + 같은 응답 붙여넣기 + 분석 클릭으로도 동일 결과)
-```
+## Summary Quality
 
-## 응답 텍스트 작성 팁 (매핑 품질 향상)
+The backend does deterministic local summary only. To improve the session flow:
 
-response_mapper는 단순 토큰 매칭으로 동작하므로 다음을 지키면 매핑이 정확해집니다.
+- Mention changed files in backticks, e.g. `frontend/src/pages/ChangePage.tsx`.
+- Name whether the step was implementation, review, review-fix, or validation.
+- Describe behavior and intent, not syntax trivia.
+- Call out technical considerations such as state persistence, API contracts,
+  diff boundaries, review gates, validation, and UI flow.
+- Keep review findings and review-fix notes in distinct paragraphs when possible.
 
-- 파일은 인라인 코드로: `` `backend/app/routers/changes.py` ``
-- 심볼은 인라인 코드로: `` `hello()` `` 또는 `` `ChangePage` ``
-- 단락(빈 줄)으로 주제를 분리: 한 단락 = 한 노드 / 관계 설명
-- 코드 펜스(``` ``` ```)는 그래프 매핑에서 제외되고 원본 응답 영역에만 표시됩니다.
+## Constraints
 
-## 주의
-
-- `project_root`는 반드시 git 저장소 안.
-- 백엔드는 127.0.0.1만 바인딩 (외부 노출 금지).
-- 사용자에게 보내지 *않은* 내용을 `assistant_response`에 넣지 마세요. 매핑된 단락이
-  실제 변경과 어긋나면 시각화가 거짓이 됩니다.
+- Do not call an external LLM API for Codeflow Light docs.
+- Do not invent implementation details for `assistant_response`; send only the
+  answer you are about to give the user.
+- Do not use Codeflow Light to generate line-by-line code comments. The app
+  summarizes session steps and technical decisions instead.
+- If capture fails, still answer the user and briefly mention the local capture
+  error.

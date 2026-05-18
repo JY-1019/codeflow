@@ -1,133 +1,119 @@
 # Codeflow Light
 
-**Codex / Claude Code의 응답 + 실제 git 변경 = 시각화된 변경 설명.**
+**Codex / Claude Code 대화를 Markdown 명령 -> 구현 -> 리뷰 -> 리뷰 반영 -> 검증 흐름으로 보여주는 로컬 데스크탑 시각화 도구.**
 
-백엔드는 LLM API를 호출하지 않습니다. AI가 이미 만든 응답 텍스트를 받아 변경된 파일·심볼 노드에 단락 단위로 매핑하고, 그 결과를 React Flow 그래프로 보여줍니다.
+Codeflow Light는 백엔드에서 LLM API를 호출하지 않습니다. AI가 이미 만든 사용자 prompt, 최종 응답, 현재 git diff를 받아 한 대화 세션 안의 요청들을 시간순으로 저장합니다. `markdown-branch-push`와 `markdown-branch-commit` capture는 세션/요청 단위로 묶이고, 각 요청 안에서 처리한 Markdown 명령과 구현, 리뷰, 리뷰 반영, 검증, 커밋, push/merge 단계를 flowchart로 보여줍니다. 구현 요약, 리뷰/검증 요약, 기술 고려사항은 로컬에서 계산합니다.
 
-원본 [codeflow](../codeflow)에서 제거한 기능:
-
-- 프로젝트 파일 시스템 sync
-- RAG / 임베딩 인덱스
-- 문서 자동 생성
-- FlowForge / 백엔드 LLM 호출
-- 채팅 스트림
-
-남은 한 가지 책임: **AI 응답을 변경 그래프로 시각화**.
+파일은 그래프의 주 노드가 아니라 오른쪽 상세 패널의 확인 정보입니다. 사용자는 각 요청을 클릭해 받은 Markdown 원문, 리뷰 루프 단계별 작업, 파일별 삭제/추가 라인을 확인하고, 그래프에서는 Markdown 명령이 어떤 루프로 처리됐는지를 먼저 봅니다.
 
 ## 동작 흐름
 
 ```
-Codex / Claude Code의 응답 텍스트  ─┐
-                                   ├──► /api/changes ──► ChangeGraph
-git diff (working / staged / range)─┘                    (nodes + edges + node.body)
-                                                                ▼
-                                            React Flow + 노드/엣지 doc panel
+Codex / Claude prompt + final response ─┐
+                                        ├──► /api/sessions/capture
+git diff (working / staged / range / branch) ─┘
+                                                ▼
+                          request group + Markdown workflow + file diff facts
+                                                ▼
+                        React Flow Markdown review flow + detail panel
 ```
 
-응답의 각 단락은:
-1. 인라인 코드(``` `foo.py` `` 또는 `` `hello` ``)와 일반 텍스트에서 파일명/심볼명을 찾는다.
-2. 매칭된 노드의 `body`로 첨부된다 (점수 상위 3개 노드).
-3. 어디에도 매칭 안 된 단락은 그래프의 `narrative`로 모아 화면 좌측에 표시된다.
+각 capture step은 다음 정보를 갖습니다.
 
-LLM은 한 번도 호출되지 않습니다 — 매칭은 단순 토큰 매칭(`re`)으로 처리.
+- `phase`: `implementation`, `review`, `review_fix`, `verification`, `planning`
+- `workflow_runs`: Markdown Branch Push/Commit이 처리한 Markdown 명령과 단계 목록
+- `implementation`: 구현된 내용 요약
+- `review`: 리뷰 finding, 검증, 후속 수정 요약
+- `technical_considerations`: 세션 지속성, diff 경계, API 계약, UI 흐름, 검증 등
+- `graph`: 이번 step에서 직접 바뀐 파일과 raw 삭제/추가 라인
 
 ## 구조
 
 ```
 codeflow-light/
-├── backend/                              # FastAPI (LLM 호출 없음)
+├── backend/                              # FastAPI, 외부 LLM 호출 없음
 │   ├── main.py
 │   └── app/
-│       ├── routers/
-│       │   ├── health.py
-│       │   └── changes.py
-│       └── services/changes/
-│           ├── git_diff.py               # working/staged/range diff 파싱
-│           ├── symbol_extractor.py       # Python/TS/Go/Java 심볼 추출 (정규식)
-│           ├── graph_builder.py          # diff + 심볼 → 노드/엣지
-│           └── response_mapper.py        # AI 응답 단락 → 노드 body 매핑
-├── frontend/                             # Vite + React + @xyflow/react
+│       ├── routers/changes.py            # changes/session capture API
+│       └── services/
+│           ├── changes/                  # git diff 수집과 파일 그래프 생성
+│           └── sessions/                 # session store + summary enrichment
+├── frontend/                             # Electron + Vite + React + @xyflow/react
 │   └── src/
-│       ├── pages/ChangePage.tsx          # 3분할: 응답 · 그래프 · 노드 doc
-│       ├── components/
-│       │   ├── NarrativePanel.tsx
-│       │   ├── ChangeFlow.tsx
-│       │   ├── DocPanel.tsx
-│       │   ├── nodes/ChangeNodeView.tsx
-│       │   └── edges/ChangeEdgeView.tsx
-│       └── api/client.ts
-└── skill/SKILL.md                        # Claude Code skill wrapper
+│       ├── pages/ChangePage.tsx          # 세션 흐름 / 최종 diff 화면
+│       ├── components/SessionFlow.tsx    # Markdown 명령 + 리뷰 루프 flowchart
+│       ├── components/DocPanel.tsx       # Markdown 원문 + loop 요약 + 파일별 +/- 라인 패널
+│       └── types/changes.ts
+└── skill/SKILL.md                        # Codex / Claude Code capture wrapper
 ```
-
-## 노드/엣지 모델
-
-| node kind | 의미                                                                  |
-| --------- | --------------------------------------------------------------------- |
-| changed   | AI가 추가/수정한 파일·함수·클래스                                     |
-| affected  | 변경된 심볼을 참조하는 다른 파일 (`git grep`로 자동 발견)             |
-
-| edge kind     | 의미                                       |
-| ------------- | ------------------------------------------ |
-| contains      | 파일이 함수/클래스를 포함                  |
-| calls         | 변경 심볼이 다른 변경 심볼을 호출/참조     |
-| referenced_by | 외부 파일이 변경 심볼을 사용               |
-| renamed_from  | 이름 변경                                  |
-
-각 노드의 `body`는 AI 응답의 관련 단락. 각 엣지의 `summary`는 양 끝 노드 정보로 생성된 기본 문장 (LLM 미사용).
 
 ## 빠른 시작
 
-### 1. 백엔드
+### 데스크탑 앱
+
+```bash
+cd frontend
+npm install
+npm run desktop
+```
+
+Electron 앱이 FastAPI 백엔드를 함께 띄웁니다. 백엔드는 `127.0.0.1:8019`만 사용하며 LLM 키가 필요 없습니다.
+
+패키징:
+
+```bash
+cd frontend
+npm run dist
+```
+
+### 개발 모드
 
 ```bash
 cd backend
 python3 -m venv venv && source venv/bin/activate
 pip install -e .
-python main.py        # 127.0.0.1:8019, LLM 키 불필요
+python main.py
 ```
-
-### 2. 프론트엔드
 
 ```bash
 cd frontend
 npm install
-npm run dev           # http://localhost:5174
+npm run dev
 ```
 
-### 3. 사용
+## 사용 모드
 
-1. 브라우저에서 `http://localhost:5174`.
-2. `project root`에 git 저장소 경로 입력.
-3. `AI 응답` 영역에 Codex/Claude Code가 만든 응답을 그대로 붙여넣기.
-4. **분석** 클릭 → 변경 그래프 + 매핑된 노드 doc + 미매핑 narrative 표시.
-5. 노드/엣지를 클릭하면 우측에 해당 단락 + diff snippet.
+**Session Flow**가 기본 화면입니다. Codex/Claude skill이 보낸 capture를 세션/요청 단위로 묶고, Markdown Branch Push/Commit 요청은 요청 노드 아래에 Markdown 명령 노드와 구현/리뷰/리뷰 반영/검증 루프 노드로 배치합니다. 왼쪽 패널은 전체 Markdown 명령 수와 loop 단계 수를 압축해서 보여주고, 오른쪽 패널은 선택한 요청의 받은 Markdown 원문, loop 단계별 상태, 파일별 삭제/추가 라인을 보여줍니다.
 
 ## API
 
-### `POST /api/changes`
+### `POST /api/sessions/capture`
 
 ```json
 {
   "project_root": "/path/to/repo",
-  "source": "working", // "working" | "staged" | "range"
-  "base_ref": null, // range일 때 필수
-  "head_ref": null,
-  "assistant_response": "이번 수정은 `lib.py`의 `hello` 함수를..."
+  "source": "branch",
+  "user_prompt": "구현 후 리뷰 흐름을 시각화해줘",
+  "assistant_response": "구현 요약...",
+  "session_id": "optional-stable-session-id"
 }
 ```
 
-응답: `{ nodes, edges, narrative, warnings, ... }` — 자세한 스키마는 `frontend/src/types/changes.ts`의 `ChangeGraphResponse`.
+응답은 `{ session_id, project_root, branch, groups, latest_group_id, summary }`입니다. 각 group에는 `phase`, `phase_label`, `summary`, `graph`가 포함됩니다.
 
-`assistant_response`가 빈 문자열이면 그래프 구조만 반환되고 노드/엣지 body는 빈 채로 남습니다.
+### `POST /api/changes`
 
-## Claude Code Skill로 호출
+저수준 diff 분석용 API입니다. `source`는 `working`, `staged`, `range`, `branch`를 지원합니다.
+
+## Codex / Claude Skill로 호출
 
 ```bash
-mkdir -p ~/.claude/skills/codeflow-light
-ln -sf "$PWD/skill/SKILL.md" ~/.claude/skills/codeflow-light/SKILL.md
+mkdir -p ~/.codex/skills ~/.claude/skills
+ln -sfn "$PWD/skill" ~/.codex/skills/codeflow-light
+ln -sfn "$PWD/skill" ~/.claude/skills/codeflow-light
 ```
 
-이후 Claude Code에서 "방금 한 변경 보여줘" 또는 `/codeflow-light`로 호출 가능. 자세한 호출 규약은 `skill/SKILL.md` 참고.
+이후 Codex/Claude Code에서 "방금 흐름 보여줘" 또는 `/codeflow-light`로 호출하면 skill이 Electron 앱을 자동으로 열고 `/api/sessions/capture`로 현재 step을 저장합니다.
 
 ## 테스트
 
@@ -136,4 +122,7 @@ cd backend
 PYTHONPATH=. venv/bin/python -m pytest tests/ -v
 ```
 
-5 tests: 심볼 추출, diff→graph 파이프라인, 단락 분리, 응답↔노드 매핑, 빈 응답 안전성.
+```bash
+cd frontend
+npm run typecheck
+```

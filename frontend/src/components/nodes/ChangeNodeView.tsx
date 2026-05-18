@@ -1,63 +1,175 @@
+import { memo } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
+import { Book, Code, Plus, Minus, FileText, Box, Component, Layers } from "lucide-react";
 import type { ChangeNode } from "@/types/changes";
 
-const STATUS_COLORS: Record<string, string> = {
-  added: "border-emerald-400 bg-emerald-950/40",
-  modified: "border-sky-400 bg-sky-950/40",
-  deleted: "border-rose-400 bg-rose-950/40",
-  renamed: "border-amber-400 bg-amber-950/40",
-  unchanged: "border-slate-500 bg-slate-900/60",
+/**
+ * Per-kind base style (used when status is "unchanged" or when we want to
+ * show *what kind* of node this is).
+ */
+const KIND_CONFIG: Record<
+  string,
+  { label: string; color: string; icon: string }
+> = {
+  changed: { label: "CHANGED", color: "#60a5fa", icon: "✎" },
+  affected: { label: "AFFECTED", color: "#a855f7", icon: "↘" },
+  context: { label: "CONTEXT", color: "#f59e0b", icon: "✦" },
+  file: { label: "FILE", color: "#94a3b8", icon: "▣" },
 };
 
-const KIND_BADGE: Record<string, string> = {
-  changed: "bg-sky-500/20 text-sky-200",
-  affected: "bg-purple-500/20 text-purple-200",
-  context: "bg-amber-500/20 text-amber-200",
-  file: "bg-slate-500/20 text-slate-200",
+/**
+ * Diff-status color override (matches original codeflow CustomNodes.tsx).
+ */
+const STATUS_COLOR: Record<string, { color: string; opacity?: number }> = {
+  added: { color: "#4ade80" },
+  modified: { color: "#60a5fa" },
+  deleted: { color: "#f87171", opacity: 0.7 },
+  renamed: { color: "#fb923c" },
+  unchanged: { color: "#64748b" },
 };
 
-export function ChangeNodeView({ data, selected }: NodeProps) {
-  const node = data as unknown as ChangeNode & { kind: string };
-  const statusClass = STATUS_COLORS[node.status] ?? STATUS_COLORS.unchanged;
-  const badgeClass = KIND_BADGE[node.kind] ?? KIND_BADGE.changed;
-  const ring = selected ? "ring-2 ring-sky-300" : "";
+const SYMBOL_KIND_ICON: Record<string, typeof FileText> = {
+  file: FileText,
+  function: Component,
+  method: Component,
+  class: Box,
+  module: Layers,
+};
+
+interface ChangeNodeData extends ChangeNode {
+  hasBody?: boolean;
+}
+
+export const ChangeNodeView = memo(({ data, selected }: NodeProps) => {
+  const node = data as unknown as ChangeNodeData;
+  const kindConfig = KIND_CONFIG[node.kind] ?? KIND_CONFIG.changed;
+  const statusEntry = STATUS_COLOR[node.status] ?? STATUS_COLOR.unchanged;
+
+  // status takes precedence over kind for the border/glow (matches codeflow)
+  const statusColor = node.status === "unchanged" ? kindConfig.color : statusEntry.color;
+  const boxShadow = `0 0 10px ${statusColor}40`;
+  const opacity = statusEntry.opacity ?? 1;
+
+  const SymbolIcon = SYMBOL_KIND_ICON[node.symbol_kind] ?? FileText;
+  const hasBody = Boolean(node.body && node.body.trim());
+  const hasSnippet = Boolean(node.snippet && node.snippet.trim());
+
   return (
     <div
-      className={`w-[280px] rounded-md border ${statusClass} ${ring} px-3 py-2 shadow-md`}
+      className={`relative min-w-[220px] rounded-lg border-2 shadow-lg transition-all duration-200 ${
+        selected ? "scale-[1.03] ring-2 ring-white/50" : ""
+      }`}
+      style={{
+        backgroundColor: "#1e293b",
+        borderColor: statusColor,
+        boxShadow,
+        opacity,
+      }}
     >
-      <Handle type="target" position={Position.Left} />
-      <div className="flex items-center justify-between gap-2">
-        <div className="truncate text-[13px] font-semibold text-slate-100">
-          {node.label}
+      <Handle
+        id="left"
+        type="target"
+        position={Position.Left}
+        className="!h-3.5 !w-3.5 !border-2 !border-white transition-transform hover:!scale-125"
+        style={{ backgroundColor: statusColor }}
+      />
+
+      <div
+        className="flex items-center justify-between gap-2 rounded-t-md px-3 py-1.5"
+        style={{ backgroundColor: `${kindConfig.color}30` }}
+      >
+        <div className="flex items-center gap-1.5">
+          <span className="text-[13px] leading-none" style={{ color: kindConfig.color }}>
+            {kindConfig.icon}
+          </span>
+          <span
+            className="text-[10px] font-semibold uppercase tracking-wider"
+            style={{ color: kindConfig.color }}
+          >
+            {kindConfig.label}
+          </span>
+          <span className="rounded bg-slate-900/60 px-1.5 py-0.5 text-[9px] uppercase text-slate-300">
+            {node.symbol_kind || "file"}
+          </span>
         </div>
-        <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] ${badgeClass}`}>
-          {node.kind}
-        </span>
-      </div>
-      <div className="mt-0.5 truncate text-[11px] text-slate-400">
-        {node.file}
-        {node.start_line ? `:${node.start_line}` : ""}
-      </div>
-      <div className="mt-1 flex flex-wrap items-center gap-1 text-[10px] text-slate-300">
-        <span className="rounded bg-slate-700/60 px-1.5 py-0.5">
-          {node.symbol_kind || "file"}
-        </span>
-        <span className="rounded bg-slate-700/60 px-1.5 py-0.5">
-          {node.status}
-        </span>
-        {node.added_lines ? (
-          <span className="text-emerald-300">+{node.added_lines}</span>
-        ) : null}
-        {node.removed_lines ? (
-          <span className="text-rose-300">-{node.removed_lines}</span>
-        ) : null}
-      </div>
-      {node.summary ? (
-        <div className="mt-1.5 line-clamp-2 text-[11px] text-slate-300">
-          {node.summary}
+        <div className="flex items-center gap-1.5 text-[10px]">
+          {node.added_lines ? (
+            <span className="inline-flex items-center gap-0.5 text-emerald-300">
+              <Plus className="h-2.5 w-2.5" />
+              {node.added_lines}
+            </span>
+          ) : null}
+          {node.removed_lines ? (
+            <span className="inline-flex items-center gap-0.5 text-rose-300">
+              <Minus className="h-2.5 w-2.5" />
+              {node.removed_lines}
+            </span>
+          ) : null}
+          <span
+            className="rounded px-1.5 py-0.5 font-medium uppercase tracking-wider"
+            style={{
+              backgroundColor: `${statusColor}25`,
+              color: statusColor,
+            }}
+          >
+            {node.status}
+          </span>
         </div>
-      ) : null}
-      <Handle type="source" position={Position.Right} />
+      </div>
+
+      <div className="px-3 py-2">
+        <div className="flex items-center gap-1.5">
+          <SymbolIcon className="h-3 w-3 shrink-0 text-slate-400" />
+          <div
+            className="truncate text-[13px] font-medium"
+            style={{ color: statusColor }}
+            title={node.label}
+          >
+            {node.label}
+          </div>
+        </div>
+        <div className="mt-0.5 truncate text-[11px] text-slate-400" title={node.file}>
+          {node.file}
+        </div>
+        {node.summary ? (
+          <div className="mt-1.5 line-clamp-2 text-[11px] text-slate-300">{node.summary}</div>
+        ) : null}
+      </div>
+
+      <div className="flex gap-1 border-t border-slate-600/60 px-3 py-1.5">
+        <button
+          className={`flex flex-1 items-center justify-center gap-1 rounded px-2 py-1 text-[10px] transition-colors ${
+            hasBody
+              ? "bg-purple-600/25 text-purple-300"
+              : "bg-slate-700/50 text-slate-500"
+          }`}
+          title={hasBody ? "AI 응답에서 매핑된 설명 있음" : "매핑된 설명 없음"}
+        >
+          <Book className="h-3 w-3" />
+          Doc
+        </button>
+        <button
+          className={`flex flex-1 items-center justify-center gap-1 rounded px-2 py-1 text-[10px] transition-colors ${
+            hasSnippet
+              ? "bg-emerald-600/25 text-emerald-300"
+              : "bg-slate-700/50 text-slate-500"
+          }`}
+          title={hasSnippet ? "diff snippet 있음" : "snippet 없음"}
+        >
+          <Code className="h-3 w-3" />
+          Diff
+        </button>
+      </div>
+
+      <Handle
+        id="right"
+        type="source"
+        position={Position.Right}
+        className="!h-3.5 !w-3.5 !border-2 !border-white transition-transform hover:!scale-125"
+        style={{ backgroundColor: statusColor }}
+      />
     </div>
   );
-}
+});
+
+ChangeNodeView.displayName = "ChangeNodeView";
