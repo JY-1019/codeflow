@@ -20,13 +20,16 @@ from app.services.changes.session_delta import (
 from app.services.codex_usage import codex_usage_summary
 from app.services.sessions.store import (
     append_group,
+    append_workflow_event,
     default_session_id,
     get_latest_full_graph,
     get_latest_session,
+    get_latest_workflow_full_graph,
 )
 from app.services.text_sanitizer import clean_captured_text
 
 router = APIRouter()
+DIFF_EVENT_STEP_KINDS = {"implementation", "review_fix"}
 
 
 _CACHE_LOCK = threading.Lock()
@@ -59,6 +62,34 @@ class SessionCaptureRequest(ChangesRequest):
         default=None,
         description="같은 Codex/Claude 대화의 group들을 묶는 식별자. 비우면 repo+branch 기준.",
     )
+
+
+class SessionWorkflowEventRequest(SessionCaptureRequest):
+    workflow_id: str = Field(
+        default="",
+        description="한 Markdown review-loop 명령을 묶는 안정적인 id입니다.",
+    )
+    run_id: str = Field(
+        default="",
+        description="같은 workflow 안에서 Markdown 파일 하나를 나타내는 id입니다.",
+    )
+    skill: str = Field(default="", description="markdown-branch-push 또는 markdown-branch-commit")
+    skill_label: str = Field(default="", description="UI에 표시할 skill 이름")
+    command_label: str = Field(default="", description="UI에 표시할 Markdown 명령/run 이름")
+    markdown_path: str = Field(default="", description="구현 단위 Markdown 파일 경로")
+    markdown_title: str = Field(default="", description="구현 단위 Markdown 제목")
+    markdown_content: str = Field(default="", description="구현 단위 Markdown 전문")
+    branch_name: str = Field(default="", description="해당 Markdown 단위 작업 브랜치")
+    step_id: str = Field(default="", description="같은 step을 갱신하고 싶을 때 쓰는 안정적인 id")
+    step_kind: str = Field(
+        default="implementation",
+        description="preflight | markdown | branch | implementation | review | review_fix | verification | commit | push | merge",
+    )
+    step_label: str = Field(default="", description="노드 제목")
+    step_summary: str = Field(default="", description="노드 상단에 표시할 요약")
+    step_detail: str = Field(default="", description="노드 상세 패널에 표시할 설명")
+    step_status: str = Field(default="completed", description="completed | skipped | pending | blocked | unknown")
+    files: list[str] = Field(default_factory=list, description="이 step과 직접 연결할 파일 목록")
 
 
 def _resolve_project_root(raw: Optional[str]) -> str:
@@ -197,6 +228,64 @@ async def sessions_capture(request: SessionCaptureRequest) -> dict:
         user_prompt=request.user_prompt,
         session_id=capture_session_id,
     )
+
+
+@router.post("/sessions/event", tags=["Sessions"])
+async def sessions_event(request: SessionWorkflowEventRequest) -> dict:
+    """Append one live Markdown review-loop step to the current session."""
+    cleaned_response = clean_captured_text(request.assistant_response)
+    full_graph = _build_graph(request)
+    full_snapshot = serialized_graph_snapshot(full_graph)
+    capture_session_id = (request.session_id or "").strip() or default_session_id(
+        full_graph.project_root
+    )
+    previous_full_graph = get_latest_workflow_full_graph(
+        full_graph.project_root,
+        session_id=capture_session_id,
+        workflow_id=request.workflow_id,
+        run_id=request.run_id,
+        markdown_path=request.markdown_path,
+        markdown_title=request.markdown_title,
+    )
+
+    filter_graph_to_session_delta(full_graph, previous_full_graph, cleaned_response)
+    result = _graph_response(full_graph, cleaned_response or request.step_detail or request.step_summary)
+    latest_result = _graph_response(_build_graph(request), cleaned_response)
+
+    with _CACHE_LOCK:
+        _cache_latest_result(latest_result)
+    return append_workflow_event(
+        project_root=result["project_root"],
+        graph=result,
+        full_graph=full_snapshot,
+        user_prompt=request.user_prompt,
+        session_id=capture_session_id,
+        workflow_id=request.workflow_id,
+        run_id=request.run_id,
+        skill=request.skill,
+        skill_label=request.skill_label,
+        command_label=request.command_label,
+        markdown_path=request.markdown_path,
+        markdown_title=request.markdown_title,
+        markdown_content=request.markdown_content,
+        branch_name=request.branch_name,
+        step_id=request.step_id,
+        step_kind=request.step_kind,
+        step_label=request.step_label,
+        step_summary=request.step_summary,
+        step_detail=clean_captured_text(request.step_detail),
+        step_status=request.step_status,
+        files=_event_files_scope(request.step_kind, request.files),
+    )
+
+
+def _event_files_scope(step_kind: str, files: list[str]) -> list[str] | None:
+    cleaned = [file.strip() for file in files if file.strip()]
+    if cleaned:
+        return cleaned
+    if step_kind.strip().lower() in DIFF_EVENT_STEP_KINDS:
+        return None
+    return []
 
 
 @router.get("/sessions/latest", tags=["Sessions"])

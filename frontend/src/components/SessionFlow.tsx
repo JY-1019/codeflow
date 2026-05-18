@@ -68,6 +68,7 @@ const FLOW_STEP_KINDS = new Set([
   "push",
   "merge",
 ]);
+const TERMINAL_STEP_KINDS = new Set(["verification", "commit", "push", "merge"]);
 
 function buildSessionFlow(session: ChangeSessionResponse): { nodes: Node[]; edges: Edge[] } {
   const nodes: Node[] = [];
@@ -77,11 +78,15 @@ function buildSessionFlow(session: ChangeSessionResponse): { nodes: Node[]; edge
 
   session.groups.forEach((group, index) => {
     const rows = visualStepRowsForGroup(group);
+    const rowSpan = Math.max(
+      RUN_GAP_Y,
+      maxGridRows(rows) * STEP_GAP_Y + FRAME_BOTTOM_PADDING
+    );
     const frameWidth = Math.max(
       380,
       FRAME_PADDING_X * 2 + NODE_WIDTH + (FLOW_COLUMN_COUNT - 1) * STEP_GAP_X
     );
-    const frameHeight = BASE_Y + rows.length * RUN_GAP_Y + FRAME_BOTTOM_PADDING;
+    const frameHeight = BASE_Y + rows.length * rowSpan + FRAME_BOTTOM_PADDING;
     const frameId = `frame::${group.id}`;
 
     nodes.push({
@@ -102,15 +107,16 @@ function buildSessionFlow(session: ChangeSessionResponse): { nodes: Node[]; edge
     let groupLastNode: string | null = null;
     rows.forEach((row, rowIndex) => {
       let previousStepNode: string | null = null;
+      const stepPositions = stepGridPositions(row.steps);
       row.steps.forEach((step, stepIndex) => {
         const stepNodeId = `step::${group.id}::${row.id}::${stepIndex}::${step.id}`;
-        const stepPosition = stepGridPosition(step, stepIndex);
+        const stepPosition = stepPositions[stepIndex];
         nodes.push({
           id: stepNodeId,
           type: "workflowStep",
           position: {
             x: groupX + FRAME_PADDING_X + stepPosition.column * STEP_GAP_X,
-            y: BASE_Y + rowIndex * RUN_GAP_Y + stepPosition.row * STEP_GAP_Y,
+            y: BASE_Y + rowIndex * rowSpan + stepPosition.row * STEP_GAP_Y,
           },
           sourcePosition: Position.Right,
           targetPosition: Position.Left,
@@ -141,6 +147,16 @@ function buildSessionFlow(session: ChangeSessionResponse): { nodes: Node[]; edge
   });
 
   return { nodes, edges };
+}
+
+function maxGridRows(rows: VisualStepRow[]): number {
+  let maxRow = 0;
+  rows.forEach((row) => {
+    stepGridPositions(row.steps).forEach((position) => {
+      maxRow = Math.max(maxRow, position.row);
+    });
+  });
+  return maxRow + 1;
 }
 
 interface VisualStepRow {
@@ -228,21 +244,50 @@ function workflowEdge(id: string, source: string, target: string, kind: string):
   };
 }
 
+function stepGridPositions(steps: MarkdownWorkflowStep[]): Array<{ column: number; row: number }> {
+  const duplicateCounts = new Map<string, number>();
+  let reviewCount = 0;
+  let currentLoopIndex = 0;
+
+  return steps.map((step, stepIndex) => {
+    const duplicateIndex = duplicateCounts.get(step.kind) ?? 0;
+    duplicateCounts.set(step.kind, duplicateIndex + 1);
+
+    let loopIndex = duplicateIndex;
+    if (step.kind === "review") {
+      loopIndex = reviewCount;
+      currentLoopIndex = loopIndex;
+      reviewCount += 1;
+    } else if (step.kind === "review_fix") {
+      loopIndex = reviewCount > 0 ? Math.max(reviewCount - 1, duplicateIndex) : duplicateIndex;
+      currentLoopIndex = loopIndex;
+    } else if (TERMINAL_STEP_KINDS.has(step.kind)) {
+      loopIndex = currentLoopIndex;
+    } else if (step.kind === "implementation") {
+      currentLoopIndex = Math.max(currentLoopIndex, duplicateIndex);
+    }
+
+    return stepGridPosition(step, stepIndex, loopIndex);
+  });
+}
+
 function stepGridPosition(
   step: MarkdownWorkflowStep,
-  fallbackIndex: number
+  fallbackIndex: number,
+  loopIndex = 0
 ): { column: number; row: number } {
+  const rowOffset = loopIndex * 2;
   if (step.kind === "preflight") return { column: 0, row: 0 };
   if (step.kind === "markdown") return { column: 0, row: 1 };
   if (step.kind === "branch") return { column: 0, row: 2 };
-  if (step.kind === "implementation") return { column: 1, row: 1 };
-  if (step.kind === "review") return { column: 2, row: 0 };
-  if (step.kind === "review_fix") return { column: 3, row: 1 };
-  if (step.kind === "verification") return { column: 4, row: 0 };
-  if (step.kind === "commit") return { column: 4, row: 1 };
-  if (step.kind === "push") return { column: 4, row: 2 };
-  if (step.kind === "merge") return { column: 4, row: 3 };
-  return { column: Math.min(FLOW_COLUMN_COUNT - 1, fallbackIndex), row: 1 };
+  if (step.kind === "implementation") return { column: 1, row: 1 + rowOffset };
+  if (step.kind === "review") return { column: 2, row: 0 + rowOffset };
+  if (step.kind === "review_fix") return { column: 3, row: 1 + rowOffset };
+  if (step.kind === "verification") return { column: 4, row: 0 + rowOffset };
+  if (step.kind === "commit") return { column: 4, row: 1 + rowOffset };
+  if (step.kind === "push") return { column: 4, row: 2 + rowOffset };
+  if (step.kind === "merge") return { column: 4, row: 3 + rowOffset };
+  return { column: Math.min(FLOW_COLUMN_COUNT - 1, fallbackIndex), row: 1 + rowOffset };
 }
 
 function SessionFlowInner({
@@ -395,7 +440,7 @@ function EmptySession() {
       <GitBranch className="h-8 w-8 text-slate-600" />
       <div className="text-[13px]">아직 기록된 flow가 없습니다.</div>
       <div className="max-w-md text-[12px] text-slate-500">
-        Codex 또는 Claude skill이 사용자 질의와 응답을 보내면 구현/리뷰 단위가 자동으로 채워집니다.
+        Codex 또는 Claude skill이 workflow event를 보내면 구현/리뷰 단위가 자동으로 채워집니다.
       </div>
     </div>
   );

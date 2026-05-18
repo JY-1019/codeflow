@@ -108,6 +108,10 @@ export interface MarkdownWorkflowStep {
   detail: string;
   status: MarkdownWorkflowStepStatus;
   files: string[];
+  created_at?: string;
+  sequence?: number;
+  event_order?: number;
+  graph?: ChangeGraphResponse;
 }
 
 export interface MarkdownWorkflowRun {
@@ -126,8 +130,10 @@ export interface MarkdownWorkflowRun {
 export interface ChangeGroup {
   id: string;
   sequence?: number;
+  workflow_id?: string;
   name: string;
   created_at: string;
+  updated_at?: string;
   project_root: string;
   user_prompt: string;
   assistant_response: string;

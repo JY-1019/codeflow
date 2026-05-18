@@ -141,11 +141,14 @@ function GroupDoc({ group }: { group: ChangeGroup }) {
 
 function WorkflowStepDoc({ item }: { item: SelectedWorkflowStepDetails }) {
   const { group, run, step } = item;
-  const allFileNodes = changedFileNodes(group.graph);
+  const stepGraph = step.graph ?? group.graph;
+  const allFileNodes = changedFileNodes(stepGraph);
   const showsDiff = step.kind === "implementation" || step.kind === "review_fix";
   const fileNodes = showsDiff ? allFileNodes : [];
   const fallbackFiles = showsDiff
-    ? group.summary?.changed_files ?? allFileNodes.map((node) => node.file)
+    ? step.files.length > 0
+      ? step.files
+      : group.summary?.changed_files ?? allFileNodes.map((node) => node.file)
     : [];
   const added = showsDiff ? sum(allFileNodes.map((node) => node.added_lines)) : 0;
   const removed = showsDiff ? sum(allFileNodes.map((node) => node.removed_lines)) : 0;

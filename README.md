@@ -2,30 +2,34 @@
 
 **Codex / Claude Code 대화를 Markdown 명령 -> 구현 -> 리뷰 -> 리뷰 반영 -> 검증 흐름으로 보여주는 로컬 데스크탑 시각화 도구.**
 
-Codeflow Light는 백엔드에서 LLM API를 호출하지 않습니다. AI가 이미 만든 사용자 prompt, 최종 응답, 현재 git diff를 받아 한 대화 세션 안의 요청들을 시간순으로 저장합니다. `markdown-branch-push`와 `markdown-branch-commit` capture는 세션/요청 단위로 묶이고, 각 요청 안에서 처리한 Markdown 명령과 구현, 리뷰, 리뷰 반영, 검증, 커밋, push/merge 단계를 flowchart로 보여줍니다. 구현 요약, 리뷰/검증 요약, 기술 고려사항은 로컬에서 계산합니다.
+Codeflow Light는 백엔드에서 LLM API를 호출하지 않습니다. `markdown-branch-push`와 `markdown-branch-commit` workflow가 실행되는 동안 Markdown 명령, 구현, 리뷰, 리뷰 반영, 검증, 커밋, push/merge 이벤트를 로컬 API에 하나씩 기록합니다. 각 이벤트는 세션/요청 단위로 묶이고, Electron 화면은 진행 중인 리뷰 루프를 poll해서 flowchart로 갱신합니다. 구현 요약, 리뷰/검증 요약, 기술 고려사항은 로컬에서 계산합니다.
 
-파일은 그래프의 주 노드가 아니라 오른쪽 상세 패널의 확인 정보입니다. 사용자는 각 요청을 클릭해 받은 Markdown 원문, 리뷰 루프 단계별 작업, 파일별 삭제/추가 라인을 확인하고, 그래프에서는 Markdown 명령이 어떤 루프로 처리됐는지를 먼저 봅니다.
+파일은 그래프의 주 노드가 아니라 오른쪽 상세 패널의 확인 정보입니다. 사용자는 구현 node와 리뷰 반영 node를 클릭해 해당 단계에서 실제로 생긴 diff를 확인하고, 리뷰 node에서는 리뷰 결과 요약만 읽습니다. 그래프에서는 Markdown 명령이 어떤 루프로 처리됐는지를 먼저 봅니다.
 
 ## 동작 흐름
 
 ```
-Codex / Claude prompt + final response ─┐
-                                        ├──► /api/sessions/capture
-git diff (working / staged / range / branch) ─┘
-                                                ▼
-                          request group + Markdown workflow + file diff facts
-                                                ▼
-                        React Flow Markdown review flow + detail panel
+Markdown command event ─┐
+Implementation event ───┤
+Review event ───────────┼──► /api/sessions/event
+Review-fix event ───────┤
+Verify/commit/push ─────┘
+                         │
+git diff snapshot ───────┘
+                         ▼
+         request group + explicit workflow nodes + per-step diff facts
+                         ▼
+        Electron Session Flow + implementation/review detail panel
 ```
 
-각 capture step은 다음 정보를 갖습니다.
+기존 final-response 기반 capture는 `/api/sessions/capture` fallback으로 남아 있지만, Markdown 리뷰 루프의 기본 경로는 `/api/sessions/event`입니다. 각 event step은 다음 정보를 갖습니다.
 
 - `phase`: `implementation`, `review`, `review_fix`, `verification`, `planning`
 - `workflow_runs`: Markdown Branch Push/Commit이 처리한 Markdown 명령과 단계 목록
 - `implementation`: 구현된 내용 요약
 - `review`: 리뷰 finding, 검증, 후속 수정 요약
 - `technical_considerations`: 세션 지속성, diff 경계, API 계약, UI 흐름, 검증 등
-- `graph`: 이번 step에서 직접 바뀐 파일과 raw 삭제/추가 라인
+- `graph`: 해당 step에서 직접 바뀐 파일과 raw 삭제/추가 라인
 
 ## 구조
 
@@ -83,9 +87,29 @@ npm run dev
 
 ## 사용 모드
 
-**Session Flow**가 기본 화면입니다. Codex/Claude skill이 보낸 capture를 세션/요청 단위로 묶고, Markdown Branch Push/Commit 요청은 요청 노드 아래에 Markdown 명령 노드와 구현/리뷰/리뷰 반영/검증 루프 노드로 배치합니다. 왼쪽 패널은 전체 Markdown 명령 수와 loop 단계 수를 압축해서 보여주고, 오른쪽 패널은 선택한 요청의 받은 Markdown 원문, loop 단계별 상태, 파일별 삭제/추가 라인을 보여줍니다.
+**Session Flow**가 기본 화면입니다. Codex/Claude skill이 보낸 event를 세션/요청 단위로 묶고, Markdown Branch Push/Commit 요청은 Markdown 명령 노드와 구현/리뷰/리뷰 반영/검증 루프 노드로 배치합니다. 왼쪽 패널은 전체 Markdown 명령 수와 loop 단계 수를 압축해서 보여주고, 오른쪽 패널은 선택한 단계의 요약과 파일별 삭제/추가 라인을 보여줍니다.
 
 ## API
+
+### `POST /api/sessions/event`
+
+```json
+{
+  "project_root": "/path/to/repo",
+  "source": "branch",
+  "session_id": "optional-stable-session-id",
+  "workflow_id": "stable-id-for-this-user-command",
+  "run_id": "stable-id-for-one-markdown-file",
+  "skill": "markdown-branch-commit",
+  "markdown_path": "requests/01-ui.md",
+  "step_kind": "implementation",
+  "step_summary": "SessionFlow가 구현/리뷰/리뷰 반영 node를 표시하도록 수정했습니다.",
+  "step_detail": "구현 단계에서 바뀐 내용을 설명합니다.",
+  "step_status": "completed"
+}
+```
+
+`step_kind`는 `preflight`, `markdown`, `branch`, `implementation`, `review`, `review_fix`, `verification`, `commit`, `push`, `merge`를 지원합니다.
 
 ### `POST /api/sessions/capture`
 
@@ -99,7 +123,7 @@ npm run dev
 }
 ```
 
-응답은 `{ session_id, project_root, branch, groups, latest_group_id, summary }`입니다. 각 group에는 `phase`, `phase_label`, `summary`, `graph`가 포함됩니다.
+응답은 `{ session_id, project_root, branch, groups, latest_group_id, summary }`입니다. 각 group에는 `phase`, `phase_label`, `summary`, `workflow_runs`, `graph`가 포함됩니다.
 
 ### `POST /api/changes`
 
@@ -113,7 +137,7 @@ ln -sfn "$PWD/skill" ~/.codex/skills/codeflow-light
 ln -sfn "$PWD/skill" ~/.claude/skills/codeflow-light
 ```
 
-이후 Codex/Claude Code에서 "방금 흐름 보여줘" 또는 `/codeflow-light`로 호출하면 skill이 Electron 앱을 자동으로 열고 `/api/sessions/capture`로 현재 step을 저장합니다.
+이후 Codex/Claude Code에서 Markdown Branch skill과 `codeflow-light`를 함께 호출하면 skill이 Electron 앱을 자동으로 열고 `/api/sessions/event`로 각 단계를 저장합니다. "방금 흐름 보여줘" 또는 `/codeflow-light`처럼 단독 호출한 경우에는 legacy `/api/sessions/capture` fallback으로 현재 diff를 저장할 수 있습니다.
 
 ## 테스트
 

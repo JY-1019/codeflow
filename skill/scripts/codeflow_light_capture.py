@@ -160,6 +160,44 @@ def post_capture(payload: dict[str, Any]) -> dict[str, Any]:
         raise RuntimeError(f"capture failed ({exc.code}): {detail}") from exc
 
 
+def post_event(payload: dict[str, Any]) -> dict[str, Any]:
+    req = urllib.request.Request(
+        f"{API_BASE}/sessions/event",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=60) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"event capture failed ({exc.code}): {detail}") from exc
+
+
+def stdin_or_arg(stdin_payload: dict[str, Any], key: str, arg_value: str = "") -> str:
+    return str(stdin_payload.get(key) or arg_value or "")
+
+
+def read_list_arg(stdin_payload: dict[str, Any], key: str, arg_values: list[str] | None) -> list[str]:
+    raw = stdin_payload.get(key)
+    if isinstance(raw, list):
+        return [str(item) for item in raw if str(item).strip()]
+    if isinstance(raw, str) and raw.strip():
+        return [item.strip() for item in raw.split(",") if item.strip()]
+    return arg_values or []
+
+
+def latest_group(result: dict[str, Any]) -> dict[str, Any]:
+    groups = result.get("groups", [])
+    latest_group_id = str(result.get("latest_group_id") or "")
+    if latest_group_id:
+        for group in groups:
+            if isinstance(group, dict) and group.get("id") == latest_group_id:
+                return group
+    return groups[-1] if groups else {}
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Capture a Codex/Claude turn into Codeflow Light.")
     parser.add_argument("--project-root", default="")
@@ -171,6 +209,25 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--assistant-response", default="")
     parser.add_argument("--prompt-file", default="")
     parser.add_argument("--response-file", default="")
+    parser.add_argument("--workflow-id", default=os.environ.get("CODEFLOW_LIGHT_WORKFLOW_ID", ""))
+    parser.add_argument("--run-id", default="")
+    parser.add_argument("--skill", default="")
+    parser.add_argument("--skill-label", default="")
+    parser.add_argument("--command-label", default="")
+    parser.add_argument("--markdown-path", default="")
+    parser.add_argument("--markdown-title", default="")
+    parser.add_argument("--markdown-content", default="")
+    parser.add_argument("--markdown-file", default="")
+    parser.add_argument("--branch-name", default="")
+    parser.add_argument("--event-kind", default="")
+    parser.add_argument("--step-kind", default="")
+    parser.add_argument("--step-id", default="")
+    parser.add_argument("--step-label", default="")
+    parser.add_argument("--summary", default="")
+    parser.add_argument("--detail", default="")
+    parser.add_argument("--detail-file", default="")
+    parser.add_argument("--status", default="completed")
+    parser.add_argument("--changed-file", action="append", default=[])
     return parser.parse_args()
 
 
@@ -188,6 +245,11 @@ def main() -> int:
         or stdin_payload.get("assistant_response", "")
     )
     session_id = default_capture_session_id(args.session_id, stdin_payload)
+    event_kind = stdin_or_arg(stdin_payload, "event_kind", args.event_kind) or stdin_or_arg(
+        stdin_payload,
+        "step_kind",
+        args.step_kind,
+    )
 
     launch_desktop(project_root, session_id)
     wait_for_api()
@@ -201,9 +263,48 @@ def main() -> int:
         "assistant_response": assistant_response,
         "session_id": session_id or None,
     }
+    if event_kind:
+        markdown_content = (
+            read_text_arg(None, args.markdown_file)
+            or stdin_or_arg(stdin_payload, "markdown_content", args.markdown_content)
+        )
+        event_payload = {
+            **payload,
+            "workflow_id": stdin_or_arg(stdin_payload, "workflow_id", args.workflow_id),
+            "run_id": stdin_or_arg(stdin_payload, "run_id", args.run_id),
+            "skill": stdin_or_arg(stdin_payload, "skill", args.skill),
+            "skill_label": stdin_or_arg(stdin_payload, "skill_label", args.skill_label),
+            "command_label": stdin_or_arg(stdin_payload, "command_label", args.command_label),
+            "markdown_path": stdin_or_arg(stdin_payload, "markdown_path", args.markdown_path),
+            "markdown_title": stdin_or_arg(stdin_payload, "markdown_title", args.markdown_title),
+            "markdown_content": markdown_content,
+            "branch_name": stdin_or_arg(stdin_payload, "branch_name", args.branch_name),
+            "step_id": stdin_or_arg(stdin_payload, "step_id", args.step_id),
+            "step_kind": event_kind,
+            "step_label": stdin_or_arg(stdin_payload, "step_label", args.step_label),
+            "step_summary": stdin_or_arg(stdin_payload, "step_summary", args.summary),
+            "step_detail": (
+                read_text_arg(args.detail, args.detail_file)
+                or stdin_or_arg(stdin_payload, "step_detail", "")
+                or stdin_or_arg(stdin_payload, "detail", "")
+            ),
+            "step_status": stdin_or_arg(stdin_payload, "step_status", args.status),
+            "files": read_list_arg(stdin_payload, "files", args.changed_file),
+        }
+        result = post_event(event_payload)
+        latest = latest_group(result)
+        runs = latest.get("workflow_runs", [])
+        steps = sum(len(run.get("steps", [])) for run in runs if isinstance(run, dict))
+        print(
+            "Codeflow Light event captured "
+            f"session={result.get('session_id')} group={latest.get('name')} "
+            f"kind={event_kind} workflow={event_payload.get('workflow_id') or latest.get('workflow_id')} "
+            f"steps={steps}"
+        )
+        return 0
+
     result = post_capture(payload)
-    groups = result.get("groups", [])
-    latest = groups[-1] if groups else {}
+    latest = latest_group(result)
     graph = latest.get("graph", {})
     print(
         "Codeflow Light captured "

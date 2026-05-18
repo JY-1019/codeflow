@@ -16,6 +16,7 @@ PHASE_LABELS: dict[str, str] = {
     "verification": "검증",
     "planning": "정리",
 }
+DIFF_STEP_KINDS = {"implementation", "review_fix"}
 
 
 def enrich_session_response(response: dict[str, Any]) -> dict[str, Any]:
@@ -42,21 +43,36 @@ def enrich_group(group: dict[str, Any], sequence: int) -> dict[str, Any]:
     if graph:
         enriched["graph"] = clean_graph_docs(graph)
         graph = _graph(enriched)
+    explicit_workflow_runs = _clean_workflow_runs(enriched.get("workflow_runs"))
+    workflow_graph = _combined_workflow_graph(explicit_workflow_runs)
+    if explicit_workflow_runs:
+        graph = clean_graph_docs(workflow_graph)
+        enriched["graph"] = graph
     file_nodes = _changed_file_nodes(graph)
-    phase = infer_phase(prompt, response, file_nodes)
+    phase = _explicit_workflow_phase(explicit_workflow_runs) or infer_phase(prompt, response, file_nodes)
 
     enriched["sequence"] = sequence
     enriched["phase"] = phase
     enriched["phase_label"] = PHASE_LABELS.get(phase, phase)
-    workflow_runs = build_markdown_workflow_runs(
+    workflow_runs = explicit_workflow_runs or build_markdown_workflow_runs(
         prompt=prompt,
         response=response,
         graph=graph,
     )
     enriched["workflow_runs"] = workflow_runs
+    implementation_items = (
+        _workflow_step_summaries(explicit_workflow_runs, {"implementation", "review_fix"})
+        if explicit_workflow_runs
+        else implementation_summary(file_nodes, response)
+    )
+    review_items = (
+        _workflow_step_summaries(explicit_workflow_runs, {"review", "verification"})
+        if explicit_workflow_runs
+        else review_summary(prompt, response, phase)
+    )
     enriched["summary"] = {
-        "implementation": implementation_summary(file_nodes, response),
-        "review": review_summary(prompt, response, phase),
+        "implementation": implementation_items,
+        "review": review_items,
         "technical_considerations": technical_considerations(graph, prompt, response),
         "changed_files": [node.get("file", "") for node in file_nodes if node.get("file")],
         "file_count": len(file_nodes),
@@ -268,6 +284,160 @@ def status_label(status: str) -> str:
 def _graph(group: dict[str, Any]) -> dict[str, Any]:
     graph = group.get("graph")
     return graph if isinstance(graph, dict) else {}
+
+
+def _clean_workflow_runs(value: Any) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    runs: list[dict[str, Any]] = []
+    for run in value:
+        if not isinstance(run, dict):
+            continue
+        steps: list[dict[str, Any]] = []
+        for step in run.get("steps") or []:
+            if not isinstance(step, dict):
+                continue
+            cleaned_step = deepcopy(step)
+            step_graph = cleaned_step.get("graph")
+            if isinstance(step_graph, dict):
+                cleaned_step["graph"] = clean_graph_docs(step_graph)
+            steps.append(cleaned_step)
+        cleaned_run = deepcopy(run)
+        cleaned_run["steps"] = steps
+        cleaned_run.pop("latest_full_graph", None)
+        runs.append(cleaned_run)
+    return runs
+
+
+def _combined_workflow_graph(workflow_runs: list[dict[str, Any]]) -> dict[str, Any]:
+    nodes: list[dict[str, Any]] = []
+    edges: list[dict[str, Any]] = []
+    node_index_by_id: dict[str, int] = {}
+    edge_ids: set[str] = set()
+    base: dict[str, Any] = {
+        "project_root": "",
+        "source": "session-events",
+        "base_ref": None,
+        "head_ref": None,
+        "narrative": "",
+        "warnings": [],
+        "nodes": nodes,
+        "edges": edges,
+        "assistant_response": "",
+    }
+
+    for run in workflow_runs:
+        for step in run.get("steps") or []:
+            if not isinstance(step, dict):
+                continue
+            graph = step.get("graph")
+            if not isinstance(graph, dict):
+                continue
+            for key in ["project_root", "source", "base_ref", "head_ref", "assistant_response"]:
+                if graph.get(key) and not base.get(key):
+                    base[key] = graph.get(key)
+            if step.get("kind") not in DIFF_STEP_KINDS:
+                continue
+            for warning in graph.get("warnings") or []:
+                if warning not in base["warnings"]:
+                    base["warnings"].append(warning)
+            for node in graph.get("nodes") or []:
+                if not isinstance(node, dict):
+                    continue
+                node_id = str(node.get("id") or node.get("file") or "")
+                if not node_id:
+                    continue
+                existing_index = node_index_by_id.get(node_id)
+                if existing_index is not None:
+                    nodes[existing_index] = _merge_workflow_graph_node(nodes[existing_index], node)
+                    continue
+                node_index_by_id[node_id] = len(nodes)
+                nodes.append(node)
+            for edge in graph.get("edges") or []:
+                if not isinstance(edge, dict):
+                    continue
+                edge_id = str(edge.get("id") or f"{edge.get('source')}->{edge.get('target')}")
+                if not edge_id or edge_id in edge_ids:
+                    continue
+                edge_ids.add(edge_id)
+                edges.append(edge)
+    return base
+
+
+def _merge_workflow_graph_node(existing: dict[str, Any], node: dict[str, Any]) -> dict[str, Any]:
+    if not _is_changed_file_node(existing) or not _is_changed_file_node(node):
+        return existing
+
+    merged = deepcopy(existing)
+    merged["added_lines"] = int(existing.get("added_lines") or 0) + int(node.get("added_lines") or 0)
+    merged["removed_lines"] = int(existing.get("removed_lines") or 0) + int(node.get("removed_lines") or 0)
+    merged["snippet"] = _join_unique_text(
+        [str(existing.get("snippet") or ""), str(node.get("snippet") or "")],
+        separator="\n",
+    )
+    merged["body"] = _join_unique_text(
+        [str(existing.get("body") or ""), str(node.get("body") or "")],
+        separator="\n\n",
+    )
+    if not str(merged.get("summary") or "").strip():
+        merged["summary"] = str(node.get("summary") or "").strip()
+    return merged
+
+
+def _is_changed_file_node(node: dict[str, Any]) -> bool:
+    return node.get("kind") == "changed" and node.get("symbol_kind") == "file"
+
+
+def _join_unique_text(values: list[str], *, separator: str) -> str:
+    output: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        cleaned = value.strip()
+        if not cleaned or cleaned in seen:
+            continue
+        seen.add(cleaned)
+        output.append(cleaned)
+    return separator.join(output)
+
+
+def _explicit_workflow_phase(workflow_runs: list[dict[str, Any]]) -> str:
+    latest_step: dict[str, Any] | None = None
+    latest_key: tuple[int, str, int] = (-1, "", -1)
+    for run in workflow_runs:
+        for step in run.get("steps") or []:
+            if not isinstance(step, dict):
+                continue
+            key = (
+                int(step.get("event_order") or 0),
+                str(step.get("created_at") or ""),
+                int(step.get("sequence") or 0),
+            )
+            if key >= latest_key:
+                latest_key = key
+                latest_step = step
+    kind = str(latest_step.get("kind") or "") if latest_step else ""
+    if kind in {"implementation", "review", "review_fix", "verification"}:
+        return kind
+    if kind in {"preflight", "markdown", "branch"}:
+        return "planning"
+    if kind in {"commit", "push", "merge"}:
+        return "verification"
+    return ""
+
+
+def _workflow_step_summaries(
+    workflow_runs: list[dict[str, Any]],
+    kinds: set[str],
+) -> list[str]:
+    items: list[str] = []
+    for run in workflow_runs:
+        for step in run.get("steps") or []:
+            if not isinstance(step, dict) or step.get("kind") not in kinds:
+                continue
+            summary = str(step.get("summary") or "").strip()
+            if summary:
+                items.append(summary)
+    return _unique(items)[:5]
 
 
 def _changed_file_nodes(graph: dict[str, Any]) -> list[dict[str, Any]]:

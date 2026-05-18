@@ -316,10 +316,10 @@ export function ChangePage() {
           className="flex w-full items-center justify-between px-4 py-1.5 text-[11px] uppercase tracking-wider text-slate-400 hover:text-slate-200"
         >
           <span>
-            AI 응답 텍스트{" "}
+            수동 capture 텍스트{" "}
             {assistantResponse.trim()
               ? `· ${assistantResponse.length}자`
-              : "· skill capture가 보내면 자동으로 채워짐"}
+              : "· event/capture가 보내면 자동으로 채워짐"}
             <CodexUsageInline usage={codexUsage} loading={usageLoading} />
           </span>
           {responseInputOpen ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
@@ -334,7 +334,7 @@ export function ChangePage() {
             <textarea
               value={assistantResponse}
               onChange={(e) => setAssistantResponse(e.target.value)}
-              placeholder="수동 review용 응답 텍스트"
+            placeholder="legacy capture용 응답 텍스트"
               rows={4}
               className="w-full resize-y rounded border border-slate-700 bg-slate-950 px-2 py-1.5 text-[12px] text-slate-100 outline-none focus:border-cyan-500"
             />
@@ -726,7 +726,7 @@ function SessionPanel({
       <div className="min-h-0 flex-1 overflow-y-auto p-2">
         {!session || session.groups.length === 0 ? (
           <div className="px-2 py-8 text-center text-[12px] text-slate-500">
-            skill capture 대기 중
+            workflow event 대기 중
           </div>
         ) : (
           <div className="space-y-2">
