@@ -48,7 +48,9 @@ codeflow-light/
 │       ├── components/SessionFlow.tsx    # Markdown 명령 + 리뷰 루프 flowchart
 │       ├── components/DocPanel.tsx       # Markdown 원문 + loop 요약 + 파일별 +/- 라인 패널
 │       └── types/changes.ts
-└── skill/SKILL.md                        # Codex / Claude Code capture wrapper
+└── skill/
+    ├── bin/codeflow                      # Desktop app launcher executable
+    └── SKILL.md                          # Codex / Claude Code capture wrapper
 ```
 
 ## 빠른 시작
@@ -56,12 +58,18 @@ codeflow-light/
 ### 데스크탑 앱
 
 ```bash
+./skill/bin/codeflow --project-root "$PWD"
+```
+
+`codeflow` 실행 파일이 필요한 frontend dependency를 설치하고 renderer build가 없거나 stale하면 다시 build한 뒤 Electron 앱을 띄웁니다. Electron 앱이 FastAPI 백엔드를 함께 띄웁니다. 백엔드는 `127.0.0.1:8019`만 사용하며 LLM 키가 필요 없습니다.
+
+개발 중 직접 npm script를 사용해도 됩니다.
+
+```bash
 cd frontend
 npm install
 npm run desktop
 ```
-
-Electron 앱이 FastAPI 백엔드를 함께 띄웁니다. 백엔드는 `127.0.0.1:8019`만 사용하며 LLM 키가 필요 없습니다.
 
 패키징:
 
@@ -138,6 +146,8 @@ ln -sfn "$PWD/skill" ~/.claude/skills/codeflow-light
 ```
 
 이후 Codex/Claude Code에서 Markdown Branch skill과 `codeflow-light`를 함께 호출하면 skill이 Electron 앱을 자동으로 열고 `/api/sessions/event`로 각 단계를 저장합니다. "방금 흐름 보여줘" 또는 `/codeflow-light`처럼 단독 호출한 경우에는 legacy `/api/sessions/capture` fallback으로 현재 diff를 저장할 수 있습니다.
+
+skill의 capture script는 `CODEFLOW_LIGHT_EXECUTABLE`이 있으면 그 경로를 우선 사용하고, 없으면 `~/.codex/skills/codeflow-light/bin/codeflow` 또는 skill에 번들된 실행 파일을 사용합니다.
 
 ## 테스트
 

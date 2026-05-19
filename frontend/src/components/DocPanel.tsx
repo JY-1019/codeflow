@@ -153,7 +153,7 @@ function WorkflowStepDoc({ item }: { item: SelectedWorkflowStepDetails }) {
   const added = showsDiff ? sum(allFileNodes.map((node) => node.added_lines)) : 0;
   const removed = showsDiff ? sum(allFileNodes.map((node) => node.removed_lines)) : 0;
   const StatusIcon = statusIcon(step.status);
-  const content = stepPrimaryContent(step);
+  const content = stepPrimaryContent(item);
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col overflow-y-auto p-3 text-[13px]">
@@ -218,6 +218,10 @@ function GroupNarrative({
 }) {
   const groupedSteps = groupWorkflowSteps(workflowSteps);
   const hasStructuredSteps = Object.values(groupedSteps).some((items) => items.length > 0);
+  const implementationStepItems = groupedSteps.implementation.map((step) => step.summary);
+  const reviewStepItems = groupedSteps.review.map((step) => step.summary);
+  const reviewFixItems = groupedSteps.review_fix.map((step) => step.summary);
+  const verificationItems = groupedSteps.verification.map((step) => step.summary);
 
   if (!hasStructuredSteps) {
     return (
@@ -231,23 +235,29 @@ function GroupNarrative({
   return (
     <div className="space-y-3">
       <NarrativeBlock
-        title="구현/처리한 내용"
-        items={[...implementation, ...groupedSteps.implementation.map((step) => step.summary)]}
+        title="구현한 내용"
+        items={[
+          ...withoutExactText(implementation, reviewFixItems),
+          ...implementationStepItems,
+        ]}
         empty="구현 내용이 아직 없습니다."
       />
       <NarrativeBlock
         title="리뷰 내용"
-        items={[...review, ...groupedSteps.review.map((step) => step.summary)]}
+        items={[
+          ...withoutExactText(review, verificationItems),
+          ...reviewStepItems,
+        ]}
         empty="리뷰 내용이 아직 없습니다."
       />
       <NarrativeBlock
         title="리뷰 반영 내용"
-        items={groupedSteps.review_fix.map((step) => step.summary)}
+        items={reviewFixItems}
         empty="반영할 리뷰 finding이 없거나 아직 기록되지 않았습니다."
       />
       <NarrativeBlock
         title="검증 내용"
-        items={groupedSteps.verification.map((step) => step.summary)}
+        items={verificationItems}
         empty="검증 기록이 아직 없습니다."
       />
     </div>
@@ -369,16 +379,25 @@ function WorkflowStepList({ steps }: { steps: MarkdownWorkflowStep[] }) {
   );
 }
 
-function stepPrimaryContent(step: MarkdownWorkflowStep): string {
-  return step.detail.trim() || step.summary;
+function stepPrimaryContent({ run, step }: SelectedWorkflowStepDetails): string {
+  const parts = [step.summary, step.detail].map((item) => item.trim()).filter(Boolean);
+  if (step.kind === "markdown") {
+    const markdownContent = run?.markdown_content?.trim() ?? "";
+    if (markdownContent) {
+      parts.push(markdownContent);
+    } else if (run?.markdown_path) {
+      parts.push(`Markdown 파일: \`${run.markdown_path}\``);
+    }
+  }
+  return uniqueText(parts).join("\n\n");
 }
 
 function stepPrimaryTitle(kind: MarkdownWorkflowStep["kind"]): string {
   if (kind === "preflight") return "확인 내용";
-  if (kind === "markdown") return "Markdown 해석";
+  if (kind === "markdown") return "Markdown 명령";
   if (kind === "branch") return "브랜치 준비";
-  if (kind === "implementation") return "구현 요약";
-  if (kind === "review") return "리뷰 결과";
+  if (kind === "implementation") return "구현 내용 요약";
+  if (kind === "review") return "리뷰 요약";
   if (kind === "review_fix") return "리뷰 반영 요약";
   if (kind === "verification") return "검증 결과";
   if (kind === "commit") return "커밋 결과";
@@ -849,6 +868,11 @@ function uniqueText(items: string[]): string[] {
     output.push(normalized);
   }
   return output;
+}
+
+function withoutExactText(items: string[], excludedItems: string[]): string[] {
+  const excluded = new Set(excludedItems.map((item) => item.trim()).filter(Boolean));
+  return items.filter((item) => !excluded.has(item.trim()));
 }
 
 function sum(values: number[]): number {

@@ -116,12 +116,22 @@ Then capture `verification`, `commit`, and for push workflows `push` and
 
 The script will:
 
-1. Install missing frontend dependencies if needed.
-2. Build the renderer if the build is missing or stale.
-3. Launch/focus the Electron desktop app.
+1. Launch/focus the Electron desktop app through the bundled
+   `bin/codeflow` executable.
+2. The executable installs missing frontend dependencies if needed and builds
+   the renderer if the build is missing or stale.
+3. Start or focus the app window for the current conversation/session.
 4. Wait for the local FastAPI backend.
 5. POST event payloads to `/api/sessions/event`. Legacy final-turn payloads
    without `--event-kind` still POST to `/api/sessions/capture`.
+
+The capture script looks for `CODEFLOW_LIGHT_EXECUTABLE` first, then the
+bundled `bin/codeflow` executable. Use this when testing the desktop app
+directly:
+
+```bash
+$HOME/.codex/skills/codeflow-light/bin/codeflow --project-root "$PWD"
+```
 
 Use `CODEFLOW_LIGHT_SESSION_ID` when the caller provides a stable conversation
 or task id. In Codex Desktop, the capture script automatically falls back to

@@ -14,6 +14,7 @@ import {
 } from "@xyflow/react";
 import { GitBranch } from "lucide-react";
 import { GroupFrameNodeView } from "@/components/nodes/GroupFrameNodeView";
+import { MarkdownCommandNodeView } from "@/components/nodes/MarkdownCommandNodeView";
 import { WorkflowStepNodeView } from "@/components/nodes/WorkflowStepNodeView";
 import { usePositionUndoRedo } from "@/flow/hooks/usePositionUndoRedo";
 import { applySavedPositions } from "@/flow/utils/positions";
@@ -21,11 +22,13 @@ import type {
   ChangeGroup,
   ChangeGroupPhase,
   ChangeSessionResponse,
+  MarkdownWorkflowRun,
   MarkdownWorkflowStep,
 } from "@/types/changes";
 
 const nodeTypes = {
   frame: GroupFrameNodeView,
+  markdownCommand: MarkdownCommandNodeView,
   workflowStep: WorkflowStepNodeView,
 };
 
@@ -47,7 +50,7 @@ export interface SessionGroupFocusTarget {
 }
 
 const GROUP_GAP_X = 140;
-const STEP_GAP_X = 244;
+const STEP_GAP_X = 360;
 const STEP_GAP_Y = 148;
 const RUN_GAP_Y = 640;
 const BASE_Y = 118;
@@ -113,7 +116,7 @@ function buildSessionFlow(session: ChangeSessionResponse): { nodes: Node[]; edge
         const stepPosition = stepPositions[stepIndex];
         nodes.push({
           id: stepNodeId,
-          type: "workflowStep",
+          type: step.kind === "markdown" ? "markdownCommand" : "workflowStep",
           position: {
             x: groupX + FRAME_PADDING_X + stepPosition.column * STEP_GAP_X,
             y: BASE_Y + rowIndex * rowSpan + stepPosition.row * STEP_GAP_Y,
@@ -122,8 +125,11 @@ function buildSessionFlow(session: ChangeSessionResponse): { nodes: Node[]; edge
           targetPosition: Position.Left,
           data: {
             ...step,
+            ...(step.kind === "markdown" ? row.run : {}),
             groupId: group.id,
+            groupName: group.name,
             runId: row.id,
+            runTitle: row.title,
           },
           draggable: true,
           zIndex: 2,
@@ -161,6 +167,8 @@ function maxGridRows(rows: VisualStepRow[]): number {
 
 interface VisualStepRow {
   id: string;
+  title: string;
+  run: MarkdownWorkflowRun;
   steps: WorkflowStepDisplayData[];
 }
 
@@ -184,7 +192,7 @@ function visualStepRowsForGroup(group: ChangeGroup): VisualStepRow[] {
           branchName: run.branch_name,
           skillLabel: run.skill_label || run.skill,
         }));
-      return { id: run.id, steps };
+      return { id: run.id, title, run, steps };
     })
     .filter((row) => row.steps.length > 0);
 
@@ -211,6 +219,19 @@ function visualStepRowsForGroup(group: ChangeGroup): VisualStepRow[] {
         skillLabel: "Captured turn",
       },
     ],
+    title: group.name,
+    run: {
+      id: group.id,
+      skill: "captured-turn",
+      skill_label: "Captured turn",
+      command_label: group.name,
+      markdown_path: "",
+      markdown_title: group.name,
+      markdown_content: group.user_prompt,
+      branch_name: "",
+      status: "completed",
+      steps: [],
+    },
   }];
 }
 
@@ -303,7 +324,7 @@ function SessionFlowInner({
   const nodesRef = useRef<Node[]>([]);
   const { fitView, setCenter } = useReactFlow();
   const positionScope = session
-    ? `session-review-units:v1:${session.session_id ?? session.project_root}`
+    ? `session-review-units:v2:${session.session_id ?? session.project_root}`
     : "session-review-units";
 
   useEffect(() => {
@@ -317,7 +338,10 @@ function SessionFlowInner({
     setEdges(flow.edges);
   }, [session, positionScope, setNodes, setEdges]);
 
-  const isPositionTracked = useCallback((node: Node) => node.type === "workflowStep", []);
+  const isPositionTracked = useCallback(
+    (node: Node) => node.type === "workflowStep" || node.type === "markdownCommand",
+    []
+  );
   const { handleNodeDragStart, handleNodeDragStop } = usePositionUndoRedo({
     nodes,
     setNodes,
@@ -385,7 +409,7 @@ function SessionFlowInner({
         onNodeDragStop={handleNodeDragStop}
         onNodeClick={(_, node) => {
           const id = (node.data as { groupId?: string }).groupId;
-          if (node.type === "workflowStep" && id) {
+          if ((node.type === "workflowStep" || node.type === "markdownCommand") && id) {
             onSelectNode(id, node.id);
             return;
           }
@@ -476,7 +500,7 @@ function workflowColor(kind: string): string {
 
 function miniMapNodeColor(node: Node): string {
   if (node.type === "frame") return "#0f172a";
-  if (node.type === "workflowStep") {
+  if (node.type === "workflowStep" || node.type === "markdownCommand") {
     return workflowColor(String((node.data as { kind?: string }).kind ?? ""));
   }
   return phaseNodeColor((node.data as { phase?: ChangeGroupPhase }).phase);

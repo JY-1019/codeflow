@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -36,8 +37,31 @@ def repo_root() -> Path:
     )
 
 
-def frontend_dir() -> Path:
-    return repo_root() / "frontend"
+def codeflow_executable() -> Path:
+    configured = os.environ.get("CODEFLOW_LIGHT_EXECUTABLE", "").strip()
+    if configured:
+        path = Path(configured).expanduser()
+        if path.exists():
+            return path.resolve()
+        raise RuntimeError(f"CODEFLOW_LIGHT_EXECUTABLE does not exist: {path}")
+
+    script_path = Path(__file__).resolve()
+    candidates = [
+        script_path.parents[1] / "bin" / "codeflow",
+        repo_root() / "skill" / "bin" / "codeflow",
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate.resolve()
+
+    path = shutil.which("codeflow")
+    if path:
+        return Path(path).resolve()
+
+    raise RuntimeError(
+        "Could not find the Codeflow executable. Set CODEFLOW_LIGHT_EXECUTABLE "
+        "or use the bundled skill/bin/codeflow file."
+    )
 
 
 def read_text_arg(raw: str | None, file_path: str | None) -> str:
@@ -57,38 +81,6 @@ def read_stdin_payload() -> dict[str, Any]:
     except json.JSONDecodeError:
         return {"assistant_response": raw}
     return parsed if isinstance(parsed, dict) else {}
-
-
-def run(cmd: list[str], cwd: Path, env: dict[str, str] | None = None) -> None:
-    subprocess.run(cmd, cwd=str(cwd), env=env, check=True)
-
-
-def ensure_frontend_ready() -> None:
-    frontend = frontend_dir()
-    if not (frontend / "node_modules" / "electron").exists():
-        run(["npm", "install"], frontend)
-
-    dist_index = frontend / "dist" / "index.html"
-    if not dist_index.exists() or sources_newer_than(dist_index):
-        run(["npm", "run", "build"], frontend)
-
-
-def sources_newer_than(target: Path) -> bool:
-    watched = [
-        frontend_dir() / "src",
-        frontend_dir() / "electron",
-        frontend_dir() / "package.json",
-        frontend_dir() / "vite.config.ts",
-    ]
-    target_mtime = target.stat().st_mtime
-    for root in watched:
-        if root.is_file() and root.stat().st_mtime > target_mtime:
-            return True
-        if root.is_dir():
-            for path in root.rglob("*"):
-                if path.is_file() and path.stat().st_mtime > target_mtime:
-                    return True
-    return False
 
 
 def default_capture_session_id(raw_session_id: str, stdin_payload: dict[str, Any]) -> str:
@@ -111,18 +103,31 @@ def default_capture_session_id(raw_session_id: str, stdin_payload: dict[str, Any
 
 
 def launch_desktop(project_root: str, session_id: str) -> None:
-    ensure_frontend_ready()
-    log_path = Path(tempfile.gettempdir()) / "codeflow-light-electron.log"
+    log_path = Path(tempfile.gettempdir()) / "codeflow-light.log"
     log = log_path.open("a", encoding="utf-8")
+    executable = codeflow_executable()
     env = {
         **os.environ,
+        "CODEFLOW_LIGHT_APP_ROOT": str(repo_root()),
         "CODEFLOW_LIGHT_PROJECT_ROOT": project_root,
     }
     if session_id:
         env["CODEFLOW_LIGHT_SESSION_ID"] = session_id
+    subprocess.run(
+        [str(executable), "--project-root", project_root, "--prepare-only"],
+        cwd=str(repo_root()),
+        env=env,
+        stdout=log,
+        stderr=log,
+        stdin=subprocess.DEVNULL,
+        check=True,
+    )
+    cmd = [str(executable), "--project-root", project_root, "--no-build"]
+    if session_id:
+        cmd.extend(["--session-id", session_id])
     subprocess.Popen(
-        ["npm", "run", "electron"],
-        cwd=str(frontend_dir()),
+        cmd,
+        cwd=str(repo_root()),
         env=env,
         stdout=log,
         stderr=log,
