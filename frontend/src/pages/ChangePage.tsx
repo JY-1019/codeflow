@@ -474,17 +474,17 @@ function WorkflowOverviewBar({
   const primaryRun = selectedWorkflowStep?.run ?? activeGroup?.workflow_runs?.[0] ?? null;
   const primarySteps = primaryRun?.steps ?? [];
   const selectedStep = selectedWorkflowStep?.step ?? null;
-  const branch = session?.branch || "branch unknown";
+  const branch = session?.branch || "브랜치 미확인";
   const activeTitle = activeGroup
     ? `요청 ${activeGroup.sequence ?? ""} · ${activeGroup.name}`
-    : "capture 대기";
+    : "캡처 대기";
 
   return (
     <div className="col-span-3 border-b border-slate-800 bg-slate-900/65 px-4 py-2">
       <div className="grid gap-3 xl:grid-cols-[minmax(220px,0.9fr)_minmax(420px,1.6fr)_minmax(320px,1fr)]">
         <div className="min-w-0">
           <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-            Review loop session
+            리뷰 루프 세션
           </div>
           <div className="mt-0.5 truncate text-[13px] font-semibold text-slate-100" title={activeTitle}>
             {activeTitle}
@@ -513,7 +513,7 @@ function WorkflowOverviewBar({
                 {selectedStep ? selectedStep.label : primaryRun?.markdown_title || primaryRun?.markdown_path || "선택된 단계 없음"}
               </div>
               <div className="mt-0.5 truncate text-[10px] text-slate-500" title={primaryRun?.markdown_path || primaryRun?.command_label || ""}>
-                {selectedStep ? stepKindLabel(selectedStep.kind) : primaryRun?.skill_label || "workflow"}
+                {selectedStep ? stepKindLabel(selectedStep.kind) : workflowSkillLabel(primaryRun?.skill ?? "", primaryRun?.skill_label) || "워크플로우"}
               </div>
             </div>
             <div className="shrink-0 text-right text-[10px] text-slate-500">
@@ -726,7 +726,7 @@ function SessionPanel({
       <div className="min-h-0 flex-1 overflow-y-auto p-2">
         {!session || session.groups.length === 0 ? (
           <div className="px-2 py-8 text-center text-[12px] text-slate-500">
-            workflow event 대기 중
+            워크플로우 이벤트 대기 중
           </div>
         ) : (
           <div className="space-y-2">
@@ -758,8 +758,8 @@ function SessionPanel({
                     "사용자 질의 없음"}
                 </div>
                 <div className="mt-1 flex items-center gap-2 text-[10px] text-slate-500">
-                  <span>{group.summary?.file_count ?? 0} files</span>
-                  {group.workflow_runs?.length ? <span>{group.workflow_runs.length} runs</span> : null}
+                  <span>{group.summary?.file_count ?? 0}개 파일</span>
+                  {group.workflow_runs?.length ? <span>{group.workflow_runs.length}개 루프</span> : null}
                   <span className="text-emerald-300">+{group.summary?.added_lines ?? 0}</span>
                   <span className="text-rose-300">-{group.summary?.removed_lines ?? 0}</span>
                 </div>
@@ -799,7 +799,7 @@ function WorkflowRunPreview({ run }: { run: MarkdownWorkflowRun }) {
             {title}
           </div>
           <div className="mt-0.5 truncate text-[10px] text-slate-500" title={run.markdown_path || run.branch_name}>
-            {run.markdown_path || run.branch_name || run.skill_label || run.skill}
+            {run.markdown_path || run.branch_name || workflowSkillLabel(run.skill, run.skill_label)}
           </div>
         </div>
         <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] ${runStatusClass(run.status)}`}>
@@ -947,7 +947,7 @@ function stepIcon(kind: MarkdownWorkflowStepKind): LucideIcon {
 }
 
 function stepKindLabel(kind: MarkdownWorkflowStepKind): string {
-  if (kind === "preflight") return "Preflight";
+  if (kind === "preflight") return "사전 확인";
   if (kind === "markdown") return "Markdown";
   if (kind === "branch") return "브랜치";
   if (kind === "implementation") return "구현";
@@ -955,9 +955,22 @@ function stepKindLabel(kind: MarkdownWorkflowStepKind): string {
   if (kind === "review_fix") return "리뷰 반영";
   if (kind === "verification") return "검증";
   if (kind === "commit") return "커밋";
-  if (kind === "push") return "Push";
-  if (kind === "merge") return "Merge";
+  if (kind === "push") return "푸시";
+  if (kind === "merge") return "병합";
   return kind;
+}
+
+function workflowSkillLabel(skill: string, label?: string): string {
+  const cleaned = label?.trim() || skill.trim();
+  const known: Record<string, string> = {
+    "markdown-branch-push": "Markdown 브랜치 푸시",
+    "markdown-branch-commit": "Markdown 브랜치 커밋",
+    "captured-turn": "캡처된 턴",
+    "Markdown Branch Push": "Markdown 브랜치 푸시",
+    "Markdown Branch Commit": "Markdown 브랜치 커밋",
+    "Captured turn": "캡처된 턴",
+  };
+  return known[cleaned] ?? known[skill] ?? cleaned;
 }
 
 function statusLabel(status: MarkdownWorkflowStepStatus): string {
@@ -1005,7 +1018,7 @@ function errorMessage(err: unknown): string {
   return (
     (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ??
     (err as Error)?.message ??
-    "unknown error"
+    "알 수 없는 오류"
   );
 }
 

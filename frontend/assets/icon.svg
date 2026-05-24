@@ -1,0 +1,19 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Codeflow Light icon">
+  <defs>
+    <linearGradient id="bg" x1="168" x2="856" y1="120" y2="904" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0f172a"/>
+      <stop offset="0.52" stop-color="#082f49"/>
+      <stop offset="1" stop-color="#111827"/>
+    </linearGradient>
+    <linearGradient id="mark" x1="252" x2="772" y1="330" y2="694" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#e0f2fe"/>
+      <stop offset="0.55" stop-color="#67e8f9"/>
+      <stop offset="1" stop-color="#c4b5fd"/>
+    </linearGradient>
+  </defs>
+  <rect x="96" y="96" width="832" height="832" rx="196" fill="url(#bg)"/>
+  <rect x="126" y="126" width="772" height="772" rx="166" fill="none" stroke="#38bdf8" stroke-width="28" opacity="0.55"/>
+  <path d="M393 333L242 512L393 691" fill="none" stroke="url(#mark)" stroke-width="72" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M631 333L782 512L631 691" fill="none" stroke="url(#mark)" stroke-width="72" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M558 286L466 738" fill="none" stroke="#f8fafc" stroke-width="66" stroke-linecap="round"/>
+</svg>

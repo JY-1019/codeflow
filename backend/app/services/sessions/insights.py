@@ -210,7 +210,7 @@ def review_summary(prompt: str, response: str, phase: str) -> list[str]:
     if items:
         return items[:5]
     if phase == "review":
-        return ["리뷰 단계로 기록됐지만 요약 가능한 finding 문장은 감지되지 않았습니다."]
+        return ["리뷰 단계로 기록됐지만 요약 가능한 지적사항 문장은 감지되지 않았습니다."]
     if phase == "review_fix":
         return ["리뷰에서 나온 수정 요청을 반영한 구현 단계입니다."]
     return []
@@ -304,9 +304,39 @@ def _clean_workflow_runs(value: Any) -> list[dict[str, Any]]:
             steps.append(cleaned_step)
         cleaned_run = deepcopy(run)
         cleaned_run["steps"] = steps
+        cleaned_run["skill_label"] = _workflow_skill_label(
+            str(cleaned_run.get("skill") or ""),
+            str(cleaned_run.get("skill_label") or ""),
+        )
+        cleaned_run["command_label"] = _localized_command_label(str(cleaned_run.get("command_label") or ""))
         cleaned_run.pop("latest_full_graph", None)
         runs.append(cleaned_run)
     return runs
+
+
+def _workflow_skill_label(skill: str, label: str) -> str:
+    known = {
+        "markdown-branch-push": "Markdown 브랜치 푸시",
+        "markdown-branch-commit": "Markdown 브랜치 커밋",
+        "captured-turn": "캡처된 턴",
+        "Markdown Branch Push": "Markdown 브랜치 푸시",
+        "Markdown Branch Commit": "Markdown 브랜치 커밋",
+        "Captured turn": "캡처된 턴",
+    }
+    cleaned = label.strip() or skill.strip()
+    return known.get(cleaned, known.get(skill.strip(), cleaned))
+
+
+def _localized_command_label(label: str) -> str:
+    cleaned = label.strip()
+    replacements = {
+        "Markdown Branch Push": "Markdown 브랜치 푸시",
+        "Markdown Branch Commit": "Markdown 브랜치 커밋",
+        "Captured turn": "캡처된 턴",
+    }
+    for source, target in replacements.items():
+        cleaned = cleaned.replace(source, target)
+    return cleaned
 
 
 def _combined_workflow_graph(workflow_runs: list[dict[str, Any]]) -> dict[str, Any]:

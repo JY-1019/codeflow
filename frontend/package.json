@@ -7,9 +7,12 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "build:backend": "python3 ../scripts/build_backend_binary.py",
     "electron": "electron electron/main.cjs",
     "desktop": "npm run build && electron electron/main.cjs",
-    "dist": "npm run build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder",
+    "dist": "npm run build:backend && npm run build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder",
+    "dist:mac": "npm run build:backend && npm run build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dmg",
+    "dist:win": "npm run build:backend && npm run build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win portable --x64",
     "dist:signed": "npm run build && electron-builder",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit"
@@ -38,6 +41,12 @@
   "build": {
     "appId": "dev.codeflow.light",
     "productName": "Codeflow Light",
+    "artifactName": "Codeflow-Light-${version}-${arch}.${ext}",
+    "icon": "assets/icon.icns",
+    "publish": null,
+    "directories": {
+      "output": "release"
+    },
     "files": [
       "dist/**/*",
       "electron/**/*",
@@ -53,14 +62,42 @@
           "!__pycache__/**/*",
           "!**/__pycache__/**/*",
           "!.pytest_cache/**/*",
+          "!tests/**/*",
           "!.env",
           "!.env.*",
           "!*.egg-info/**/*"
         ]
+      },
+      {
+        "from": "backend-bin",
+        "to": "backend-bin",
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "mac": {
-      "category": "public.app-category.developer-tools"
+      "category": "public.app-category.developer-tools",
+      "icon": "assets/icon.icns",
+      "target": [
+        "dmg"
+      ]
+    },
+    "win": {
+      "icon": "assets/icon.ico",
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "requestedExecutionLevel": "asInvoker"
+    },
+    "dmg": {
+      "title": "Codeflow Light",
+      "icon": "assets/icon.icns"
     }
   }
 }

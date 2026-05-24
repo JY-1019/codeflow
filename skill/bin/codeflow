@@ -4,7 +4,38 @@ from __future__ import annotations
 import argparse
 import os
 import subprocess
+import sys
 from pathlib import Path
+
+
+def installed_app_executable() -> Path | None:
+    configured = os.environ.get("CODEFLOW_LIGHT_APP_EXECUTABLE", "").strip()
+    if configured:
+        path = Path(configured).expanduser()
+        if path.exists():
+            return path.resolve()
+        raise RuntimeError(f"CODEFLOW_LIGHT_APP_EXECUTABLE does not exist: {path}")
+
+    if sys.platform == "darwin":
+        candidates = [
+            Path("/Applications/Codeflow Light.app/Contents/MacOS/Codeflow Light"),
+            Path.home() / "Applications" / "Codeflow Light.app" / "Contents" / "MacOS" / "Codeflow Light",
+        ]
+    elif os.name == "nt":
+        candidates = [
+            Path(os.environ.get("LOCALAPPDATA", "")) / "Programs" / "Codeflow Light" / "Codeflow Light.exe",
+            Path(os.environ.get("PROGRAMFILES", "")) / "Codeflow Light" / "Codeflow Light.exe",
+            Path(os.environ.get("PROGRAMFILES(X86)", "")) / "Codeflow Light" / "Codeflow Light.exe",
+            Path.cwd() / "Codeflow-Light-0.1.0-x64.exe",
+            Path.cwd() / "Codeflow Light.exe",
+        ]
+    else:
+        candidates = []
+
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate.resolve()
+    return None
 
 
 def repo_root() -> Path:
@@ -71,23 +102,37 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-    root = repo_root()
     project_root = str(Path(args.project_root or os.environ.get("PWD", ".")).expanduser().resolve())
-
-    if not args.no_build:
-        ensure_frontend_ready()
-    if args.prepare_only:
-        return 0
 
     env = {
         **os.environ,
-        "CODEFLOW_LIGHT_APP_ROOT": str(root),
         "CODEFLOW_LIGHT_PROJECT_ROOT": project_root,
     }
     if args.session_id:
         env["CODEFLOW_LIGHT_SESSION_ID"] = args.session_id
     if args.session_title:
         env["CODEFLOW_LIGHT_SESSION_TITLE"] = args.session_title
+
+    installed_app = installed_app_executable()
+    if installed_app:
+        if args.prepare_only:
+            return 0
+        os.execvpe(str(installed_app), [str(installed_app)], env)
+        return 127
+
+    if os.environ.get("CODEFLOW_LIGHT_ALLOW_DEV_LAUNCH", "").strip() != "1":
+        raise RuntimeError(
+            "Codeflow Light installed app was not found. Install Codeflow Light.app in /Applications "
+            "or set CODEFLOW_LIGHT_APP_EXECUTABLE to the packaged app/EXE path. "
+            "Set CODEFLOW_LIGHT_ALLOW_DEV_LAUNCH=1 only for repository-local development."
+        )
+
+    root = repo_root()
+    env["CODEFLOW_LIGHT_APP_ROOT"] = str(root)
+    if not args.no_build:
+        ensure_frontend_ready()
+    if args.prepare_only:
+        return 0
 
     os.chdir(frontend_dir())
     os.execvpe("npm", ["npm", "run", "electron"], env)

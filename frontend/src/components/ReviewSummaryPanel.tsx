@@ -144,7 +144,7 @@ export function ReviewSummaryPanel({
 
             {summary.warnings.length > 0 ? (
               <section className="rounded-md border border-amber-800/70 bg-amber-950/30 p-3 text-[12px] text-amber-200">
-                <div className="mb-1 font-semibold">Warnings</div>
+                <div className="mb-1 font-semibold">경고</div>
                 <ul className="list-disc pl-4">
                   {summary.warnings.map((warning, index) => (
                     <li key={index}>{warning}</li>

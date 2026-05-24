@@ -9,8 +9,8 @@ MAX_WORKFLOW_RUNS = 12
 MAX_MARKDOWN_CHARS = 12_000
 
 WORKFLOW_SKILL_LABELS: dict[str, str] = {
-    "markdown-branch-push": "Markdown Branch Push",
-    "markdown-branch-commit": "Markdown Branch Commit",
+    "markdown-branch-push": "Markdown 브랜치 푸시",
+    "markdown-branch-commit": "Markdown 브랜치 커밋",
 }
 
 
@@ -188,8 +188,8 @@ def _workflow_steps(
     steps = [
         _step(
             "preflight",
-            "Preflight",
-            "저장소 상태, 기준 브랜치, review 명령 가능 여부를 확인합니다.",
+            "사전 확인",
+            "저장소 상태, 기준 브랜치, 리뷰 명령 가능 여부를 확인합니다.",
             _status_by_keywords(outcome_text, ["git status", "preflight", "remote", "branch"], default="unknown"),
             detail=_lines_near_keywords(outcome_text, ["git status", "preflight", "remote", "branch"]),
         ),
@@ -273,15 +273,15 @@ def _workflow_steps(
             [
                 _step(
                     "push",
-                    "브랜치 Push",
-                    "파일 브랜치를 origin에 push합니다.",
+                    "브랜치 푸시",
+                    "파일 브랜치를 origin에 푸시합니다.",
                     _push_status(outcome_text),
                     detail=_lines_near_keywords(outcome_text, ["pushed", "branch push", "브랜치 push", "브랜치 푸시", "push"]),
                 ),
                 _step(
                     "merge",
-                    "main 병합/Push",
-                    "파일 브랜치를 main에 통합하고 main을 push합니다.",
+                    "main 병합/푸시",
+                    "파일 브랜치를 main에 통합하고 main을 푸시합니다.",
                     _merge_status(outcome_text),
                     detail=_lines_near_keywords(outcome_text, ["merged", "main push", "main-pushed", "main 병합", "merge", "병합"]),
                 ),
@@ -406,12 +406,12 @@ def _review_summary(text: str) -> str:
             "review:",
         ],
     )
-    return item or "리뷰 명령을 실행해 correctness/design finding을 확인합니다."
+    return item or "리뷰 명령을 실행해 정확성/설계 지적사항을 확인합니다."
 
 
 def _review_fix_summary(text: str) -> str:
     item = _extract_line(text, ["반영", "fixed", "addressed", "수정 완료", "해결"])
-    return item or "리뷰 finding이 있으면 수정하고 다시 리뷰합니다."
+    return item or "리뷰 지적사항이 있으면 수정하고 다시 리뷰합니다."
 
 
 def _verification_summary(text: str) -> str:

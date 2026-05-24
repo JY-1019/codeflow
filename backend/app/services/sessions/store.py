@@ -26,6 +26,11 @@ WORKFLOW_STEP_ORDER = {
     "push": 90,
     "merge": 100,
 }
+WORKFLOW_SKILL_LABELS = {
+    "markdown-branch-push": "Markdown 브랜치 푸시",
+    "markdown-branch-commit": "Markdown 브랜치 커밋",
+    "captured-turn": "캡처된 턴",
+}
 
 _LOCK = threading.Lock()
 
@@ -455,12 +460,13 @@ def _find_or_create_run(
     branch_name: str,
 ) -> dict[str, Any]:
     runs = group.setdefault("workflow_runs", [])
+    localized_skill_label = _workflow_skill_label(skill, skill_label)
     for run in runs:
         if isinstance(run, dict) and run.get("id") == run_id:
             _fill_missing_run_fields(
                 run,
                 skill=skill,
-                skill_label=skill_label,
+                skill_label=localized_skill_label,
                 command_label=command_label,
                 markdown_path=markdown_path,
                 markdown_title=markdown_title,
@@ -472,8 +478,10 @@ def _find_or_create_run(
     run = {
         "id": run_id,
         "skill": skill.strip(),
-        "skill_label": skill_label.strip() or skill.strip(),
-        "command_label": command_label.strip() or markdown_title.strip() or markdown_path.strip() or run_id,
+        "skill_label": localized_skill_label,
+        "command_label": _localized_command_label(
+            command_label.strip() or markdown_title.strip() or markdown_path.strip() or run_id
+        ),
         "markdown_path": markdown_path.strip(),
         "markdown_title": markdown_title.strip(),
         "markdown_content": markdown_content.strip(),
@@ -490,8 +498,12 @@ def _fill_missing_run_fields(run: dict[str, Any], **values: str) -> None:
         cleaned = value.strip()
         if cleaned and not str(run.get(key) or "").strip():
             run[key] = cleaned
-    if not str(run.get("skill_label") or "").strip():
-        run["skill_label"] = str(run.get("skill") or "").strip()
+    run["skill_label"] = _workflow_skill_label(
+        str(run.get("skill") or ""),
+        str(run.get("skill_label") or ""),
+    )
+    if str(run.get("command_label") or "").strip():
+        run["command_label"] = _localized_command_label(str(run.get("command_label") or ""))
     if not str(run.get("command_label") or "").strip():
         run["command_label"] = (
             str(run.get("markdown_title") or "").strip()
@@ -559,7 +571,7 @@ def _clean_status(value: str) -> str:
 
 def _default_step_label(kind: str) -> str:
     return {
-        "preflight": "Preflight",
+        "preflight": "사전 확인",
         "markdown": "Markdown 명령 해석",
         "branch": "작업 브랜치 준비",
         "implementation": "구현 작업",
@@ -567,8 +579,8 @@ def _default_step_label(kind: str) -> str:
         "review_fix": "리뷰 반영",
         "verification": "검증",
         "commit": "커밋",
-        "push": "브랜치 Push",
-        "merge": "main 병합/Push",
+        "push": "브랜치 푸시",
+        "merge": "main 병합/푸시",
     }.get(kind, kind)
 
 
@@ -576,7 +588,7 @@ def _default_step_summary(kind: str, files: list[str]) -> str:
     if kind in {"implementation", "review_fix"} and files:
         return f"{len(files)}개 파일 diff를 기록했습니다."
     return {
-        "preflight": "저장소와 review 실행 조건을 확인했습니다.",
+        "preflight": "저장소와 리뷰 실행 조건을 확인했습니다.",
         "markdown": "Markdown 요청을 구현 단위로 기록했습니다.",
         "branch": "Markdown 단위 작업 브랜치를 준비했습니다.",
         "implementation": "구현 단계가 기록되었습니다.",
@@ -584,9 +596,32 @@ def _default_step_summary(kind: str, files: list[str]) -> str:
         "review_fix": "리뷰 반영 단계가 기록되었습니다.",
         "verification": "검증 결과를 기록했습니다.",
         "commit": "커밋 결과를 기록했습니다.",
-        "push": "브랜치 push 결과를 기록했습니다.",
-        "merge": "main 병합/push 결과를 기록했습니다.",
+        "push": "브랜치 푸시 결과를 기록했습니다.",
+        "merge": "main 병합/푸시 결과를 기록했습니다.",
     }.get(kind, "단계 이벤트를 기록했습니다.")
+
+
+def _workflow_skill_label(skill: str, label: str) -> str:
+    cleaned = label.strip() or skill.strip()
+    known = {
+        **WORKFLOW_SKILL_LABELS,
+        "Markdown Branch Push": "Markdown 브랜치 푸시",
+        "Markdown Branch Commit": "Markdown 브랜치 커밋",
+        "Captured turn": "캡처된 턴",
+    }
+    return known.get(cleaned, known.get(skill.strip(), cleaned))
+
+
+def _localized_command_label(label: str) -> str:
+    cleaned = label.strip()
+    replacements = {
+        "Markdown Branch Push": "Markdown 브랜치 푸시",
+        "Markdown Branch Commit": "Markdown 브랜치 커밋",
+        "Captured turn": "캡처된 턴",
+    }
+    for source, target in replacements.items():
+        cleaned = cleaned.replace(source, target)
+    return cleaned
 
 
 def _changed_files(graph: dict[str, Any]) -> list[str]:

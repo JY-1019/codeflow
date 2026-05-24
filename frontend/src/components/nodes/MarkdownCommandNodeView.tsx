@@ -28,7 +28,7 @@ export const MarkdownCommandNodeView = memo(({ data, selected }: NodeProps) => {
         <div className="flex items-center justify-between gap-2">
           <span className="inline-flex items-center gap-1.5 rounded bg-sky-500/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-sky-200">
             <Route className="h-3 w-3" />
-            {run.skill_label || run.skill}
+            {workflowSkillLabel(run.skill, run.skill_label)}
           </span>
           <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-slate-300">
             {run.status === "completed" ? "완료" : run.status === "blocked" ? "차단" : "진행"}
@@ -48,7 +48,7 @@ export const MarkdownCommandNodeView = memo(({ data, selected }: NodeProps) => {
         <div className="flex items-center justify-between gap-2">
           <span className="inline-flex items-center gap-1.5 text-slate-400">
             <BookOpenText className="h-3.5 w-3.5 text-sky-300" />
-            {run.steps?.length ?? 0} steps
+            {run.steps?.length ?? 0}단계
           </span>
           {run.branch_name ? (
             <span className="inline-flex min-w-0 items-center gap-1.5 text-slate-400">
@@ -76,4 +76,17 @@ function firstContentLine(content: string): string {
     .split("\n")
     .map((line) => line.trim())
     .find(Boolean) ?? "";
+}
+
+function workflowSkillLabel(skill: string, label?: string): string {
+  const cleaned = label?.trim() || skill.trim();
+  const known: Record<string, string> = {
+    "markdown-branch-push": "Markdown 브랜치 푸시",
+    "markdown-branch-commit": "Markdown 브랜치 커밋",
+    "captured-turn": "캡처된 턴",
+    "Markdown Branch Push": "Markdown 브랜치 푸시",
+    "Markdown Branch Commit": "Markdown 브랜치 커밋",
+    "Captured turn": "캡처된 턴",
+  };
+  return known[cleaned] ?? known[skill] ?? cleaned;
 }

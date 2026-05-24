@@ -57,6 +57,23 @@ function backendDir() {
   return path.join(repoRoot(), "backend");
 }
 
+function backendExecutableName() {
+  return process.platform === "win32" ? "codeflow-light-backend.exe" : "codeflow-light-backend";
+}
+
+function packagedBackendExecutable() {
+  const configured = process.env.CODEFLOW_LIGHT_BACKEND_EXECUTABLE;
+  if (configured && fs.existsSync(configured)) return configured;
+
+  const candidates = [
+    app.isPackaged ? path.join(process.resourcesPath, "backend-bin", backendExecutableName()) : "",
+    path.join(repoRoot(), "frontend", "backend-bin", backendExecutableName()),
+    path.join(repoRoot(), "backend-bin", backendExecutableName()),
+  ].filter(Boolean);
+
+  return candidates.find((candidate) => fs.existsSync(candidate)) || "";
+}
+
 function userDataPath(...parts) {
   return path.join(app.getPath("userData"), ...parts);
 }
@@ -99,8 +116,8 @@ function ensureBackendPython() {
   const venvDir = userDataPath("backend-venv");
   const venvPython = pythonFromVenv(venvDir);
   if (!fs.existsSync(venvPython)) {
-    const created = spawnSync("python3", ["-m", "venv", venvDir], { stdio: "ignore" });
-    if (created.status !== 0) return "python3";
+    const created = createBackendVenv(venvDir);
+    if (!created) return systemPythonFallback();
   }
 
   const marker = path.join(venvDir, ".codeflow-light-installed");
@@ -114,6 +131,34 @@ function ensureBackendPython() {
     }
   }
   return venvPython;
+}
+
+function createBackendVenv(venvDir) {
+  for (const candidate of systemPythonCandidates()) {
+    const created = spawnSync(candidate.command, [...candidate.args, "-m", "venv", venvDir], {
+      stdio: "ignore",
+    });
+    if (created.status === 0) return true;
+  }
+  return false;
+}
+
+function systemPythonCandidates() {
+  if (process.platform === "win32") {
+    return [
+      { command: "py", args: ["-3"] },
+      { command: "python", args: [] },
+      { command: "python3", args: [] },
+    ];
+  }
+  return [
+    { command: "python3", args: [] },
+    { command: "python", args: [] },
+  ];
+}
+
+function systemPythonFallback() {
+  return process.platform === "win32" ? "python" : "python3";
 }
 
 function normalizeLaunchContext(raw) {
@@ -178,8 +223,19 @@ async function ensureBackend(projectRoot) {
     CODEFLOW_LIGHT_PROJECT_ROOT: projectRoot || process.env.PWD || repoRoot(),
   };
 
-  backendProcess = spawn(ensureBackendPython(), ["main.py"], {
-    cwd: backendDir(),
+  const backendExecutable = packagedBackendExecutable();
+  if (app.isPackaged && !backendExecutable) {
+    throw new Error(
+      "Packaged Codeflow Light is missing its bundled backend executable. " +
+        "Rebuild the app with npm run build:backend before packaging."
+    );
+  }
+  const backendCommand = backendExecutable || ensureBackendPython();
+  const backendArgs = backendExecutable ? [] : ["main.py"];
+  const backendCwd = backendExecutable ? path.dirname(backendExecutable) : backendDir();
+
+  backendProcess = spawn(backendCommand, backendArgs, {
+    cwd: backendCwd,
     env,
     detached: false,
     stdio: ["ignore", logFd, logFd],

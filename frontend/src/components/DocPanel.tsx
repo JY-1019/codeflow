@@ -92,7 +92,7 @@ function GroupDoc({ group }: { group: ChangeGroup }) {
       <div className="flex items-center justify-between gap-2">
         <div>
           <div className="text-[10px] uppercase tracking-wider text-slate-500">
-            step {group.sequence ?? ""}
+            단계 {group.sequence ?? ""}
           </div>
           <div className="mt-0.5 text-base font-semibold text-slate-100">
             {group.phase_label ?? "구현"} · {group.name}
@@ -105,7 +105,7 @@ function GroupDoc({ group }: { group: ChangeGroup }) {
 
       <div className="mt-3 grid grid-cols-2 gap-2 text-[12px] text-slate-300">
         <Stat label="파일" value={summary?.file_count ?? group.graph.nodes.length} />
-        <Stat label="Loop" value={workflowFlowStepCount || summary?.workflow_step_count || 1} />
+        <Stat label="루프" value={workflowFlowStepCount || summary?.workflow_step_count || 1} />
         <Stat label="추가" value={`+${summary?.added_lines ?? 0}`} tone="emerald" />
         <Stat label="삭제" value={`-${summary?.removed_lines ?? 0}`} tone="rose" />
       </div>
@@ -160,14 +160,14 @@ function WorkflowStepDoc({ item }: { item: SelectedWorkflowStepDetails }) {
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="text-[10px] uppercase tracking-wider text-slate-500">
-            {stepKindLabel(step.kind)} node
+            {stepKindLabel(step.kind)} 노드
           </div>
           <div className="mt-0.5 text-base font-semibold leading-snug text-slate-100">
             {step.label}
           </div>
           <div className="mt-1 text-[12px] leading-relaxed text-slate-400">
             그룹 {group.sequence ?? ""} · {group.name}
-            {run ? ` · ${run.skill_label || run.skill}` : ""}
+            {run ? ` · ${workflowSkillLabel(run.skill, run.skill_label)}` : ""}
           </div>
         </div>
         <span className={`inline-flex shrink-0 items-center gap-1 rounded px-2 py-1 text-[10px] ${statusClass(step.status)}`}>
@@ -253,7 +253,7 @@ function GroupNarrative({
       <NarrativeBlock
         title="리뷰 반영 내용"
         items={reviewFixItems}
-        empty="반영할 리뷰 finding이 없거나 아직 기록되지 않았습니다."
+        empty="반영할 리뷰 지적사항이 없거나 아직 기록되지 않았습니다."
       />
       <NarrativeBlock
         title="검증 내용"
@@ -300,7 +300,7 @@ function WorkflowRunList({ runs }: { runs: MarkdownWorkflowRun[] }) {
               <div className="min-w-0">
                 <div className="inline-flex items-center gap-1.5 rounded bg-sky-500/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-sky-200">
                   <Route className="h-3 w-3" />
-                  {run.skill_label || run.skill}
+                  {workflowSkillLabel(run.skill, run.skill_label)}
                 </div>
                 <div className="mt-1 truncate text-[12px] font-semibold text-slate-100" title={run.command_label}>
                   {run.command_label}
@@ -401,13 +401,13 @@ function stepPrimaryTitle(kind: MarkdownWorkflowStep["kind"]): string {
   if (kind === "review_fix") return "리뷰 반영 요약";
   if (kind === "verification") return "검증 결과";
   if (kind === "commit") return "커밋 결과";
-  if (kind === "push") return "Push 결과";
+  if (kind === "push") return "푸시 결과";
   if (kind === "merge") return "병합 결과";
   return "노드 요약";
 }
 
 function stepKindLabel(kind: MarkdownWorkflowStep["kind"]): string {
-  if (kind === "preflight") return "Preflight";
+  if (kind === "preflight") return "사전 확인";
   if (kind === "markdown") return "Markdown";
   if (kind === "branch") return "브랜치";
   if (kind === "implementation") return "구현";
@@ -415,8 +415,8 @@ function stepKindLabel(kind: MarkdownWorkflowStep["kind"]): string {
   if (kind === "review_fix") return "리뷰 반영";
   if (kind === "verification") return "검증";
   if (kind === "commit") return "커밋";
-  if (kind === "push") return "Push";
-  if (kind === "merge") return "Merge";
+  if (kind === "push") return "푸시";
+  if (kind === "merge") return "병합";
   return kind;
 }
 
@@ -435,7 +435,7 @@ function GraphDoc({ graph }: { graph: ChangeGraphResponse }) {
   return (
     <div className="h-full min-h-0 min-w-0 space-y-4 overflow-y-auto p-3 text-[13px]">
       <div>
-        <div className="text-[10px] uppercase tracking-wider text-slate-500">diff summary</div>
+        <div className="text-[10px] uppercase tracking-wider text-slate-500">Diff 요약</div>
         <div className="mt-0.5 text-base font-semibold text-slate-100">
           {files.length}개 파일 · +{added}/-{removed}
         </div>
@@ -458,7 +458,7 @@ function GraphDoc({ graph }: { graph: ChangeGraphResponse }) {
 
       {graph.warnings.length > 0 ? (
         <div className="rounded border border-amber-700/60 bg-amber-950/40 p-2 text-[12px] text-amber-200">
-          <div className="mb-1 font-semibold">Warnings</div>
+          <div className="mb-1 font-semibold">경고</div>
           <ul className="list-disc pl-4">
             {graph.warnings.map((warning, index) => (
               <li key={index}>{warning}</li>
@@ -474,7 +474,7 @@ function NodeDoc({ node }: { node: ChangeNode }) {
   const hunkCount = countHunks(node.snippet);
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col overflow-y-auto p-3 text-[13px]">
-      <div className="text-[10px] uppercase tracking-wider text-slate-500">file</div>
+      <div className="text-[10px] uppercase tracking-wider text-slate-500">파일</div>
       <div className="mt-0.5 text-base font-semibold text-slate-100">{node.label}</div>
       <div className="truncate text-[12px] text-slate-400" title={node.file}>
         {node.file}
@@ -482,7 +482,7 @@ function NodeDoc({ node }: { node: ChangeNode }) {
 
       <div className="mt-3 grid grid-cols-2 gap-2 text-[12px] text-slate-300">
         <Stat label="상태" value={statusLabelKo(node.status)} />
-        <Stat label="Hunks" value={hunkCount || "-"} />
+        <Stat label="묶음" value={hunkCount || "-"} />
         <Stat label="추가" value={`+${node.added_lines}`} tone="emerald" />
         <Stat label="삭제" value={`-${node.removed_lines}`} tone="rose" />
       </div>
@@ -505,7 +505,7 @@ function EdgeDoc({ edge, graph }: { edge: ChangeEdge; graph: ChangeGraphResponse
   const targetNode = graph.nodes.find((n) => n.id === edge.target);
   return (
     <div className="flex h-full min-h-0 flex-col overflow-y-auto p-3 text-[13px]">
-      <div className="text-[10px] uppercase tracking-wider text-slate-500">relationship</div>
+      <div className="text-[10px] uppercase tracking-wider text-slate-500">관계</div>
       <div className="mt-0.5 text-base font-semibold text-slate-100">
         {edge.kind} · {edge.label || "연결"}
       </div>
@@ -618,7 +618,7 @@ function FileDiffList({
                 </div>
                 <div className="mt-0.5 flex items-center gap-2 text-[10px] uppercase tracking-wide text-slate-500">
                   <span>{statusLabelKo(node.status)}</span>
-                  <span>{countHunks(node.snippet) || 1} hunks</span>
+                  <span>{countHunks(node.snippet) || 1}개 묶음</span>
                 </div>
               </div>
               <span className="shrink-0 rounded bg-emerald-950/45 px-1.5 py-0.5 font-mono text-[11px] text-emerald-200">
@@ -847,6 +847,19 @@ function statusClass(status: MarkdownWorkflowStepStatus): string {
   if (status === "blocked") return "bg-rose-500/15 text-rose-200";
   if (status === "pending") return "bg-amber-500/15 text-amber-200";
   return "bg-slate-800 text-slate-400";
+}
+
+function workflowSkillLabel(skill: string, label?: string): string {
+  const cleaned = label?.trim() || skill.trim();
+  const known: Record<string, string> = {
+    "markdown-branch-push": "Markdown 브랜치 푸시",
+    "markdown-branch-commit": "Markdown 브랜치 커밋",
+    "captured-turn": "캡처된 턴",
+    "Markdown Branch Push": "Markdown 브랜치 푸시",
+    "Markdown Branch Commit": "Markdown 브랜치 커밋",
+    "Captured turn": "캡처된 턴",
+  };
+  return known[cleaned] ?? known[skill] ?? cleaned;
 }
 
 function groupWorkflowSteps(steps: MarkdownWorkflowStep[]): Record<string, MarkdownWorkflowStep[]> {

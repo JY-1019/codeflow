@@ -150,16 +150,16 @@ function phaseConfig(kind: string): {
 }
 
 function stepKindLabel(kind: string): string {
-  if (kind === "preflight") return "Preflight";
+  if (kind === "preflight") return "사전 확인";
   if (kind === "markdown") return "Markdown";
-  if (kind === "branch") return "Branch";
-  if (kind === "implementation") return "Implement";
-  if (kind === "review") return "Review";
-  if (kind === "review_fix") return "Review fix";
-  if (kind === "verification") return "Verify";
-  if (kind === "commit") return "Commit";
-  if (kind === "push") return "Push";
-  if (kind === "merge") return "Merge";
+  if (kind === "branch") return "브랜치";
+  if (kind === "implementation") return "구현";
+  if (kind === "review") return "리뷰";
+  if (kind === "review_fix") return "리뷰 반영";
+  if (kind === "verification") return "검증";
+  if (kind === "commit") return "커밋";
+  if (kind === "push") return "푸시";
+  if (kind === "merge") return "병합";
   return kind;
 }
 

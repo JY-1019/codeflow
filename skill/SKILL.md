@@ -1,11 +1,13 @@
 ---
 name: codeflow-light
 description: |
-  Use this skill during a Codex or Claude Code turn that changes code, or
-  whenever the user asks to show the current change flow, session timeline,
-  branch review, 변경 그래프, 수정 시각화, or /codeflow-light. It launches/focuses
-  the local Codeflow Light desktop app and records implementation/review-loop
-  events into the local backend. No LLM API is called by Codeflow Light.
+  Use this skill only when the user explicitly invokes Codeflow Light, for
+  example with codeflow-light, /codeflow-light, or a direct request to open,
+  show, or record Codeflow Light. Do not use it automatically for ordinary code
+  changes, reviews, or Markdown Branch workflows unless the user also asks for
+  Codeflow Light. It launches/focuses the local Codeflow Light desktop app and
+  records implementation/review-loop events into the local backend. No LLM API
+  is called by Codeflow Light.
 ---
 
 # Codeflow Light
@@ -15,9 +17,10 @@ a Markdown command and implementation/review flow. Each Codex/Claude
 conversation gets its own desktop window and session history. Markdown Branch
 Push/Commit workflows should be recorded as live events: Markdown command,
 implementation, review, review-fix, verification, commit, and push/merge each
-become concrete nodes as soon as that phase completes. Files are not the primary
-graph nodes; they are shown in the right detail panel as raw deleted/added lines
-for implementation and review-fix nodes.
+become concrete nodes as soon as that phase completes. User-facing event
+summaries, review notes, status labels, and skill labels must be written in
+Korean. Files are not the primary graph nodes; they are shown in the right
+detail panel as raw deleted/added lines for implementation and review-fix nodes.
 The session stores:
 
 - `user_prompt`: the user's latest request, shown in the right doc panel when
@@ -39,8 +42,9 @@ The app has one primary mode:
 
 ## Capture Workflow
 
-When this skill is used together with Markdown Branch Push/Commit, do not wait
-for the final response to describe the whole loop. Pick one stable
+Only run the capture workflow after the user explicitly invokes Codeflow Light.
+When this skill is explicitly used together with Markdown Branch Push/Commit, do
+not wait for the final response to describe the whole loop. Pick one stable
 `workflow_id` for the user's command and one stable `run_id` per Markdown file.
 After each phase completes, run the capture script with `--event-kind`:
 
@@ -55,7 +59,7 @@ python3 "$SCRIPT" --project-root "$PWD" --event-kind markdown <<JSON
   "workflow_id": "$WORKFLOW_ID",
   "run_id": "<stable id for this markdown file>",
   "skill": "markdown-branch-commit",
-  "skill_label": "Markdown Branch Commit",
+  "skill_label": "Markdown 브랜치 커밋",
   "command_label": "<markdown title or file name>",
   "markdown_path": "<path/to/request.md>",
   "markdown_content": "<full markdown contents>",
@@ -73,8 +77,8 @@ python3 "$SCRIPT" --project-root "$PWD" --event-kind implementation <<JSON
 {
   "workflow_id": "$WORKFLOW_ID",
   "run_id": "<stable id for this markdown file>",
-  "step_summary": "<what was implemented>",
-  "step_detail": "<implementation details>",
+  "step_summary": "<무엇을 구현했는지 한국어로 요약>",
+  "step_detail": "<구현 세부사항을 한국어로 설명>",
   "source": "branch"
 }
 JSON
@@ -87,8 +91,8 @@ python3 "$SCRIPT" --project-root "$PWD" --event-kind review <<JSON
 {
   "workflow_id": "$WORKFLOW_ID",
   "run_id": "<stable id for this markdown file>",
-  "step_summary": "<review result summary>",
-  "step_detail": "<findings or no-actionable-finding note>",
+  "step_summary": "<리뷰 결과를 한국어로 요약>",
+  "step_detail": "<리뷰 지적사항 또는 조치할 지적사항이 없었다는 내용을 한국어로 설명>",
   "source": "branch"
 }
 JSON
@@ -102,8 +106,8 @@ python3 "$SCRIPT" --project-root "$PWD" --event-kind review_fix <<JSON
 {
   "workflow_id": "$WORKFLOW_ID",
   "run_id": "<stable id for this markdown file>",
-  "step_summary": "<how review was addressed>",
-  "step_detail": "<specific fixes>",
+  "step_summary": "<리뷰를 어떻게 반영했는지 한국어로 요약>",
+  "step_detail": "<구체적인 수정 내용을 한국어로 설명>",
   "source": "branch"
 }
 JSON
@@ -114,16 +118,35 @@ Then capture `verification`, `commit`, and for push workflows `push` and
 "skipped"` when the phase intentionally did not run, and `step_status:
 "blocked"` when the loop stops on a blocker.
 
+Capture is best-effort and must never block the implementation/review loop.
+Give each capture attempt a short window, about 20-30 seconds. If the app launch
+or backend wait is still pending after that window, stop waiting, continue the
+coding workflow, and mention the local capture timeout in the final response.
+Do not retry capture in a tight loop. Later phase captures may still be
+attempted once each.
+
+When the Markdown or Obsidian requirement includes images, do not embed image
+bytes or base64 in the event payload. Preserve the Markdown content as text and
+write resolved image paths plus the observed requirement-relevant details in
+Korean inside `step_detail`.
+
 The script will:
 
 1. Launch/focus the Electron desktop app through the bundled
    `bin/codeflow` executable.
-2. The executable installs missing frontend dependencies if needed and builds
-   the renderer if the build is missing or stale.
+2. The executable uses the installed packaged app by default:
+   `/Applications/Codeflow Light.app/Contents/MacOS/Codeflow Light` on macOS,
+   or the path in `CODEFLOW_LIGHT_APP_EXECUTABLE` for a portable/installed
+   Windows EXE.
 3. Start or focus the app window for the current conversation/session.
 4. Wait for the local FastAPI backend.
 5. POST event payloads to `/api/sessions/event`. Legacy final-turn payloads
    without `--event-kind` still POST to `/api/sessions/capture`.
+
+Do not use repository-local `npm` or Python launch paths for normal usage. The
+installed DMG/EXE is the runtime surface. The repository-local development
+fallback is available only when `CODEFLOW_LIGHT_ALLOW_DEV_LAUNCH=1` is
+explicitly set for local development.
 
 The capture script looks for `CODEFLOW_LIGHT_EXECUTABLE` first, then the
 bundled `bin/codeflow` executable. Use this when testing the desktop app
@@ -131,6 +154,49 @@ directly:
 
 ```bash
 $HOME/.codex/skills/codeflow-light/bin/codeflow --project-root "$PWD"
+```
+
+## Packaged App Runtime
+
+The macOS DMG and Windows EXE are the normal runtime targets for this skill. The
+packaged app must run the monitoring UI and local backend without requiring the
+user to keep a separate repository checkout, run `npm`, or run Python manually.
+The Skill launches the installed app/EXE; the app then starts its bundled local
+backend executable.
+
+macOS runtime:
+
+```text
+/Applications/Codeflow Light.app/Contents/MacOS/Codeflow Light
+```
+
+macOS bundled backend path:
+
+```text
+Codeflow Light.app/Contents/Resources/backend-bin/codeflow-light-backend
+```
+
+Windows runtime:
+
+```text
+CODEFLOW_LIGHT_APP_EXECUTABLE=<path to Codeflow-Light-0.1.0-x64.exe>
+```
+
+Windows bundled backend path inside the packaged app:
+
+```text
+resources/backend-bin/codeflow-light-backend.exe
+```
+
+If the packaged app is missing its bundled backend executable, it should be
+rebuilt from the correct target OS. Do not fall back to repository-local backend
+source for normal Skill usage.
+
+For Windows, point the skill at the packaged EXE when it is not installed in a
+default location:
+
+```powershell
+setx CODEFLOW_LIGHT_APP_EXECUTABLE "C:\path\to\Codeflow-Light-0.1.0-x64.exe"
 ```
 
 Use `CODEFLOW_LIGHT_SESSION_ID` when the caller provides a stable conversation
@@ -143,11 +209,12 @@ available, the app falls back to repository + branch grouping.
 
 The backend does deterministic local summary only. To improve event nodes:
 
+- Write `step_summary`, `step_detail`, and review notes in Korean.
 - Mention changed files in backticks, e.g. `frontend/src/pages/ChangePage.tsx`.
 - Describe behavior and intent, not syntax trivia.
 - Call out technical considerations such as state persistence, API contracts,
   diff boundaries, review gates, validation, and UI flow.
-- Keep review findings and review-fix notes in distinct paragraphs when possible.
+- Keep review findings and review-fix notes in distinct Korean paragraphs when possible.
 
 ## Constraints
 

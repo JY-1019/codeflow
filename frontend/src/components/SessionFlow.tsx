@@ -182,7 +182,7 @@ interface WorkflowStepDisplayData extends MarkdownWorkflowStep {
 function visualStepRowsForGroup(group: ChangeGroup): VisualStepRow[] {
   const rows = (group.workflow_runs ?? [])
     .map((run, index) => {
-      const title = run.markdown_title || run.markdown_path || run.command_label || `run ${index + 1}`;
+      const title = run.markdown_title || run.markdown_path || run.command_label || `루프 ${index + 1}`;
       const steps = run.steps
         .filter((step) => FLOW_STEP_KINDS.has(step.kind))
         .map((step) => ({
@@ -190,7 +190,7 @@ function visualStepRowsForGroup(group: ChangeGroup): VisualStepRow[] {
           runTitle: title,
           markdownPath: run.markdown_path,
           branchName: run.branch_name,
-          skillLabel: run.skill_label || run.skill,
+          skillLabel: workflowSkillLabel(run.skill, run.skill_label),
         }));
       return { id: run.id, title, run, steps };
     })
@@ -216,14 +216,14 @@ function visualStepRowsForGroup(group: ChangeGroup): VisualStepRow[] {
         status: "completed",
         files: group.summary?.changed_files ?? [],
         runTitle: group.name,
-        skillLabel: "Captured turn",
+        skillLabel: "캡처된 턴",
       },
     ],
     title: group.name,
     run: {
       id: group.id,
       skill: "captured-turn",
-      skill_label: "Captured turn",
+      skill_label: "캡처된 턴",
       command_label: group.name,
       markdown_path: "",
       markdown_title: group.name,
@@ -434,7 +434,7 @@ function SessionFlowInner({
         />
       </ReactFlow>
       <div className="absolute bottom-3 left-3 z-10 rounded-md border border-slate-700/70 bg-slate-900/85 px-2 py-1.5 text-[10px] shadow-lg backdrop-blur">
-        <div className="mb-1 uppercase tracking-wider text-slate-500">flow units</div>
+        <div className="mb-1 uppercase tracking-wider text-slate-500">흐름 단위</div>
         <div className="flex flex-wrap gap-x-3 gap-y-1">
           <LegendDot color="#38bdf8" label="명령/브랜치" />
           <LegendDot color="#22d3ee" label="구현" />
@@ -442,7 +442,7 @@ function SessionFlowInner({
           <LegendDot color="#8b5cf6" label="리뷰 반영" />
           <LegendDot color="#22c55e" label="검증" />
           <LegendDot color="#6366f1" label="커밋" />
-          <LegendDot color="#84cc16" label="Push/Merge" />
+          <LegendDot color="#84cc16" label="푸시/병합" />
         </div>
       </div>
     </div>
@@ -464,10 +464,23 @@ function EmptySession() {
       <GitBranch className="h-8 w-8 text-slate-600" />
       <div className="text-[13px]">아직 기록된 flow가 없습니다.</div>
       <div className="max-w-md text-[12px] text-slate-500">
-        Codex 또는 Claude skill이 workflow event를 보내면 구현/리뷰 단위가 자동으로 채워집니다.
+        Codex 또는 Claude skill이 워크플로우 이벤트를 보내면 구현/리뷰 단위가 자동으로 채워집니다.
       </div>
     </div>
   );
+}
+
+function workflowSkillLabel(skill: string, label?: string): string {
+  const cleaned = label?.trim() || skill.trim();
+  const known: Record<string, string> = {
+    "markdown-branch-push": "Markdown 브랜치 푸시",
+    "markdown-branch-commit": "Markdown 브랜치 커밋",
+    "captured-turn": "캡처된 턴",
+    "Markdown Branch Push": "Markdown 브랜치 푸시",
+    "Markdown Branch Commit": "Markdown 브랜치 커밋",
+    "Captured turn": "캡처된 턴",
+  };
+  return known[cleaned] ?? known[skill] ?? cleaned;
 }
 
 function phaseLabel(phase: ChangeGroupPhase): string {

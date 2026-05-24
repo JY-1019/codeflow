@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 API_BASE = "http://127.0.0.1:8019/api"
+DEFAULT_CAPTURE_TIMEOUT = 30.0
 
 
 def repo_root() -> Path:
@@ -102,9 +103,8 @@ def default_capture_session_id(raw_session_id: str, stdin_payload: dict[str, Any
     return ""
 
 
-def launch_desktop(project_root: str, session_id: str) -> None:
+def launch_desktop(project_root: str, session_id: str, timeout: float = DEFAULT_CAPTURE_TIMEOUT) -> None:
     log_path = Path(tempfile.gettempdir()) / "codeflow-light.log"
-    log = log_path.open("a", encoding="utf-8")
     executable = codeflow_executable()
     env = {
         **os.environ,
@@ -113,27 +113,29 @@ def launch_desktop(project_root: str, session_id: str) -> None:
     }
     if session_id:
         env["CODEFLOW_LIGHT_SESSION_ID"] = session_id
-    subprocess.run(
-        [str(executable), "--project-root", project_root, "--prepare-only"],
-        cwd=str(repo_root()),
-        env=env,
-        stdout=log,
-        stderr=log,
-        stdin=subprocess.DEVNULL,
-        check=True,
-    )
     cmd = [str(executable), "--project-root", project_root, "--no-build"]
     if session_id:
         cmd.extend(["--session-id", session_id])
-    subprocess.Popen(
-        cmd,
-        cwd=str(repo_root()),
-        env=env,
-        stdout=log,
-        stderr=log,
-        stdin=subprocess.DEVNULL,
-        start_new_session=True,
-    )
+    with log_path.open("a", encoding="utf-8") as log:
+        subprocess.run(
+            [str(executable), "--project-root", project_root, "--prepare-only"],
+            cwd=str(repo_root()),
+            env=env,
+            stdout=log,
+            stderr=log,
+            stdin=subprocess.DEVNULL,
+            check=True,
+            timeout=timeout,
+        )
+        subprocess.Popen(
+            cmd,
+            cwd=str(repo_root()),
+            env=env,
+            stdout=log,
+            stderr=log,
+            stdin=subprocess.DEVNULL,
+            start_new_session=True,
+        )
 
 
 def wait_for_api(timeout: float = 30.0) -> None:
@@ -148,6 +150,22 @@ def wait_for_api(timeout: float = 30.0) -> None:
             last_error = str(exc)
         time.sleep(0.4)
     raise RuntimeError(f"Codeflow Light API did not become ready: {last_error}")
+
+
+def capture_timeout() -> float:
+    raw = os.environ.get("CODEFLOW_LIGHT_CAPTURE_TIMEOUT", "").strip()
+    if not raw:
+        return DEFAULT_CAPTURE_TIMEOUT
+    try:
+        timeout = float(raw)
+    except ValueError:
+        return DEFAULT_CAPTURE_TIMEOUT
+    return max(1.0, timeout)
+
+
+def skip_capture(reason: str) -> int:
+    print(f"Codeflow Light capture skipped: {reason}", file=sys.stderr)
+    return 0
 
 
 def post_capture(payload: dict[str, Any]) -> dict[str, Any]:
@@ -256,8 +274,12 @@ def main() -> int:
         args.step_kind,
     )
 
-    launch_desktop(project_root, session_id)
-    wait_for_api()
+    timeout = capture_timeout()
+    try:
+        launch_desktop(project_root, session_id, timeout=timeout)
+        wait_for_api(timeout=timeout)
+    except Exception as exc:
+        return skip_capture(str(exc))
 
     payload = {
         "project_root": project_root,
@@ -296,7 +318,10 @@ def main() -> int:
             "step_status": stdin_or_arg(stdin_payload, "step_status", args.status),
             "files": read_list_arg(stdin_payload, "files", args.changed_file),
         }
-        result = post_event(event_payload)
+        try:
+            result = post_event(event_payload)
+        except Exception as exc:
+            return skip_capture(str(exc))
         latest = latest_group(result)
         runs = latest.get("workflow_runs", [])
         steps = sum(len(run.get("steps", [])) for run in runs if isinstance(run, dict))
@@ -308,7 +333,10 @@ def main() -> int:
         )
         return 0
 
-    result = post_capture(payload)
+    try:
+        result = post_capture(payload)
+    except Exception as exc:
+        return skip_capture(str(exc))
     latest = latest_group(result)
     graph = latest.get("graph", {})
     print(
