@@ -4,7 +4,7 @@
 
 Codeflow Light는 두 부분으로 동작합니다.
 
-- **데스크탑 앱**: GitHub Releases에서 받은 DMG/EXE로 설치하는 Electron 앱입니다. 로컬 FastAPI 백엔드를 함께 띄우고 `127.0.0.1:8019`에서 이벤트를 받습니다.
+- **데스크탑 앱**: GitHub Releases에서 받은 DMG로 설치하는 Electron 앱입니다. 로컬 FastAPI 백엔드를 함께 띄우고 `127.0.0.1:8019`에서 이벤트를 받습니다.
 - **Codex / Claude Code 플러그인 또는 Skill**: 작업 중 구현, 리뷰, 리뷰 반영, 검증 이벤트를 데스크탑 앱으로 보내는 얇은 호출 어댑터입니다.
 
 플러그인은 DMG를 자동 설치하지 않습니다. 먼저 데스크탑 앱을 설치한 뒤, Codex 또는 Claude Code에서 `codeflow-light`를 명시 호출하면 그 작업 안에서 이벤트가 기록됩니다. Codeflow Light 자체는 외부 LLM API를 호출하지 않습니다.
@@ -17,7 +17,7 @@ Codeflow Light는 두 부분으로 동작합니다.
 2. DMG를 열고 `Codeflow Light.app`을 `/Applications`로 옮깁니다.
 3. 앱을 한 번 실행합니다. macOS가 차단하면 Finder에서 앱을 control-click한 뒤 `Open`을 선택합니다.
 
-Windows 사용자는 release의 `Codeflow-Light-<version>-x64.exe` portable 실행 파일을 사용합니다. 플러그인이 앱을 찾을 수 있도록 내려받은 EXE 경로를 지정하세요.
+Windows portable EXE가 release asset으로 제공되는 경우에는 내려받은 EXE 경로를 지정해 사용합니다.
 
 ```powershell
 setx CODEFLOW_LIGHT_APP_EXECUTABLE "C:\path\to\Codeflow-Light-0.1.0-x64.exe"
@@ -119,7 +119,7 @@ SCRIPT="$(command -v codeflow-light-capture || true)"
 launcher는 설치된 앱을 우선 사용합니다.
 
 - macOS: `/Applications/Codeflow Light.app/Contents/MacOS/Codeflow Light`
-- Windows: `CODEFLOW_LIGHT_APP_EXECUTABLE` 또는 기본 설치 위치
+- Windows: `CODEFLOW_LIGHT_APP_EXECUTABLE`에 지정한 portable EXE 경로
 
 앱이 설치되어 있지 않으면 정상 사용자 경로에서는 capture가 실패합니다. 개발 중 repository-local Electron fallback을 사용하려면 명시적으로 켭니다.
 
@@ -159,7 +159,7 @@ npm run dist:mac
 
 산출물은 `frontend/release/Codeflow-Light-<version>-<arch>.dmg`입니다. 이 파일은 Git에 커밋하지 말고 GitHub Release asset으로 업로드합니다.
 
-Windows portable EXE 빌드:
+Windows portable EXE 빌드(Windows 환경에서 실행):
 
 ```bash
 cd frontend
