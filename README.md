@@ -1,95 +1,141 @@
 # Codeflow Light
 
-**Codex / Claude Code 대화를 Markdown 명령 -> 구현 -> 리뷰 -> 리뷰 반영 -> 검증 흐름으로 보여주는 로컬 데스크탑 시각화 도구.**
+**Codex / Claude Code 작업을 구현 -> 리뷰 -> 리뷰 반영 -> 검증 흐름으로 보여주는 로컬 데스크탑 시각화 도구.**
 
-Codeflow Light는 백엔드에서 LLM API를 호출하지 않습니다. `markdown-branch-push`와 `markdown-branch-commit` 워크플로우가 실행되는 동안 Markdown 명령, 구현, 리뷰, 리뷰 반영, 검증, 커밋, 푸시/병합 이벤트를 로컬 API에 하나씩 기록합니다. 각 이벤트는 세션/요청 단위로 묶이고, Electron 화면은 진행 중인 리뷰 루프를 폴링해서 흐름도로 갱신합니다. 구현 요약, 리뷰/검증 요약, 기술 고려사항은 로컬에서 계산하며 화면에 표시되는 기본 요약/상태/스킬 라벨은 한국어로 출력합니다.
+Codeflow Light는 두 부분으로 동작합니다.
 
-파일은 그래프의 주 노드가 아니라 오른쪽 상세 패널의 확인 정보입니다. 사용자는 구현 node와 리뷰 반영 node를 클릭해 해당 단계에서 실제로 생긴 diff를 확인하고, 리뷰 node에서는 리뷰 결과 요약만 읽습니다. 그래프에서는 Markdown 명령이 어떤 루프로 처리됐는지를 먼저 봅니다.
+- **데스크탑 앱**: GitHub Releases에서 받은 DMG/EXE로 설치하는 Electron 앱입니다. 로컬 FastAPI 백엔드를 함께 띄우고 `127.0.0.1:8019`에서 이벤트를 받습니다.
+- **Codex / Claude Code 플러그인 또는 Skill**: 작업 중 구현, 리뷰, 리뷰 반영, 검증 이벤트를 데스크탑 앱으로 보내는 얇은 호출 어댑터입니다.
 
-## 동작 흐름
-
-```
-Markdown 명령 이벤트 ─┐
-구현 이벤트 ─────────┤
-리뷰 이벤트 ─────────┼──► /api/sessions/event
-리뷰 반영 이벤트 ────┤
-검증/커밋/푸시 ─────┘
-                         │
-git diff 스냅샷 ───────┘
-                         ▼
-         요청 group + 명시적 워크플로우 노드 + 단계별 diff 사실
-                         ▼
-        Electron Session Flow + 구현/리뷰 상세 패널
-```
-
-기존 final-response 기반 capture는 `/api/sessions/capture` fallback으로 남아 있지만, Markdown 리뷰 루프의 기본 경로는 `/api/sessions/event`입니다. 각 event step은 다음 정보를 갖습니다.
-
-- `phase`: `implementation`, `review`, `review_fix`, `verification`, `planning`
-- `workflow_runs`: Markdown 브랜치 푸시/커밋이 처리한 Markdown 명령과 단계 목록
-- `implementation`: 구현된 내용 요약
-- `review`: 리뷰 지적사항, 검증, 후속 수정 요약
-- `technical_considerations`: 세션 지속성, diff 경계, API 계약, UI 흐름, 검증 등
-- `graph`: 해당 step에서 직접 바뀐 파일과 raw 삭제/추가 라인
-
-## 구조
-
-```
-codeflow-light/
-├── backend/                              # FastAPI, 외부 LLM 호출 없음
-│   ├── main.py
-│   └── app/
-│       ├── routers/changes.py            # changes/session capture API
-│       └── services/
-│           ├── changes/                  # git diff 수집과 파일 그래프 생성
-│           └── sessions/                 # session store + summary enrichment
-├── frontend/                             # Electron + Vite + React + @xyflow/react
-│   └── src/
-│       ├── pages/ChangePage.tsx          # 세션 흐름 / 최종 diff 화면
-│       ├── components/SessionFlow.tsx    # Markdown 명령 + 리뷰 루프 flowchart
-│       ├── components/DocPanel.tsx       # Markdown 원문 + loop 요약 + 파일별 +/- 라인 패널
-│       └── types/changes.ts
-└── skill/
-    ├── bin/codeflow                      # 데스크탑 앱 실행 파일
-    └── SKILL.md                          # Codex / Claude Code capture wrapper
-```
+플러그인은 DMG를 자동 설치하지 않습니다. 먼저 데스크탑 앱을 설치한 뒤, Codex 또는 Claude Code에서 `codeflow-light`를 명시 호출하면 그 작업 안에서 이벤트가 기록됩니다. Codeflow Light 자체는 외부 LLM API를 호출하지 않습니다.
 
 ## 빠른 시작
 
-### 데스크탑 앱
+### 1. 데스크탑 앱 설치
 
-```bash
-./skill/bin/codeflow --project-root "$PWD"
+1. [GitHub Releases](https://github.com/jongyeon1019/Codeflow-light/releases/latest)에서 최신 `Codeflow-Light-<version>-<arch>.dmg`를 내려받습니다.
+2. DMG를 열고 `Codeflow Light.app`을 `/Applications`로 옮깁니다.
+3. 앱을 한 번 실행합니다. macOS가 차단하면 Finder에서 앱을 control-click한 뒤 `Open`을 선택합니다.
+
+Windows 사용자는 release의 `Codeflow-Light-<version>-x64.exe` portable 실행 파일을 사용합니다. 플러그인이 앱을 찾을 수 있도록 내려받은 EXE 경로를 지정하세요.
+
+```powershell
+setx CODEFLOW_LIGHT_APP_EXECUTABLE "C:\path\to\Codeflow-Light-0.1.0-x64.exe"
 ```
 
-`codeflow` 실행 파일이 필요한 frontend dependency를 설치하고 renderer build가 없거나 오래됐으면 다시 build한 뒤 Electron 앱을 띄웁니다. Electron 앱이 FastAPI 백엔드를 함께 띄웁니다. 백엔드는 `127.0.0.1:8019`만 사용하며 LLM 키가 필요 없습니다.
+### 2. Codex / Claude Code 연결
 
-개발 중 직접 npm script를 사용해도 됩니다.
+이 저장소 루트는 Codex와 Claude Code 플러그인 루트입니다.
 
-```bash
-cd frontend
-npm install
-npm run desktop
-```
+- Codex manifest: `.codex-plugin/plugin.json`
+- Claude Code manifest: `.claude-plugin/plugin.json`
+- Plugin skill wrapper: `skills/codeflow-light/SKILL.md`
+- Canonical skill instructions: `skill/SKILL.md`
+- Plugin PATH wrappers: `bin/codeflow`, `bin/codeflow-light-capture`
 
-공유용 단일 파일 패키징:
-
-```bash
-cd frontend
-npm run dist:mac
-```
-
-산출물은 `frontend/release/Codeflow-Light-<version>-<arch>.dmg`입니다. 이 `.dmg` 하나만 전달하면 받는 사람이 Codeflow Light 앱을 열 수 있습니다.
-
-Windows용 단일 실행 파일은 Windows 환경에서 다음 명령으로 만듭니다.
+로컬 checkout에서 Claude Code 플러그인을 확인하려면:
 
 ```bash
-cd frontend
-npm run dist:win
+claude plugin validate .
+claude --plugin-dir "$PWD" plugin details codeflow-light
 ```
 
-산출물은 `frontend/release/Codeflow-Light-<version>-x64.exe`인 portable 실행 파일입니다. Windows 실행에는 로컬 백엔드를 띄우기 위한 Python 3.11 이상이 필요하며, 앱은 처음 실행할 때 사용자 데이터 폴더에 backend venv를 만들고 필요한 패키지를 설치합니다. 앱 아이콘은 `</>` 코드 모양으로 `frontend/assets/icon.icns`와 `frontend/assets/icon.ico`에 포함됩니다.
+Claude Code에서 플러그인으로 로드되면 작업 요청에 `codeflow-light`를 명시해 plugin skill을 호출합니다.
 
-### 개발 모드
+기존 Skill 방식으로 직접 연결할 수도 있습니다.
+
+```bash
+mkdir -p ~/.codex/skills ~/.claude/skills
+ln -sfn "$PWD/skill" ~/.codex/skills/codeflow-light
+ln -sfn "$PWD/skill" ~/.claude/skills/codeflow-light
+```
+
+Codex 플러그인 manifest를 로컬에서 검증하려면:
+
+```bash
+python3 ~/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py "$PWD"
+```
+
+### 3. 작업에서 호출
+
+Codeflow Light는 백그라운드 감시기가 아닙니다. 작업 요청에 `codeflow-light`를 명시해야 그 요청의 구현/리뷰 루틴을 기록합니다.
+
+Codex 안에서 구현하고 Codex `/review`까지 기록하는 예:
+
+```text
+codeflow-light로 이번 구현과 리뷰 루틴을 Codeflow Light에 기록해줘.
+구현 후 Codex review를 품질 게이트로 실행하고, 지적사항이 있으면 반영 후 재리뷰해줘.
+검증까지 기록하고 commit/push는 하지 마.
+```
+
+Claude Code에서 구현하고 Claude Code 안의 Codex review plugin이 리뷰하는 예:
+
+```text
+codeflow-light로 이번 변경을 구현하고 Codeflow Light에 기록해줘.
+구현 단계는 Claude Code, 리뷰 단계는 Codex review plugin이 수행한 것으로 agent를 구분해줘.
+리뷰 지적사항이 있으면 반영하고 재리뷰해줘.
+검증까지 기록하고 commit/push는 생략해.
+```
+
+더 긴 복붙용 예시는 [`prompts/`](prompts/)를 참고하세요.
+
+## 무엇이 기록되나
+
+기본 기록 단위는 `/api/sessions/event` 이벤트입니다.
+
+- `implementation`: 실제 구현 단계와 해당 단계의 diff
+- `review`: 리뷰 결과 요약. 지적사항이 없어도 별도 노드로 기록
+- `review_fix`: 리뷰 지적사항을 반영한 단계와 해당 단계의 diff
+- `verification`: 실행한 focused test, typecheck, build 등
+- `commit`, `push`, `merge`: 다른 workflow가 수행한 경우에만 기록. Codeflow Light 단독 사용에서는 생략해도 됩니다.
+
+각 step은 `agent`를 가질 수 있습니다.
+
+- Codex 내부 루틴: `agent: "codex"`
+- Claude Code 구현: `agent: "claude-code"`
+- Claude Code 안의 Codex review plugin 리뷰: `agent: "codex"`
+
+같은 `workflow_id`와 `run_id`를 공유하면 구현, 리뷰, 리뷰 반영, 검증이 하나의 traceable run으로 묶이고, UI에는 단계별 수행 주체 badge가 표시됩니다.
+
+## 동작 방식
+
+```text
+사용자 prompt
+  -> Codex / Claude Code plugin 또는 Skill
+  -> codeflow-light-capture
+  -> 설치된 Codeflow Light.app / EXE 실행 또는 focus
+  -> local FastAPI backend
+  -> Electron Session Flow
+```
+
+capture script는 먼저 plugin PATH의 `codeflow-light-capture`를 찾습니다. 없으면 기존 Skill 설치 경로를 사용합니다.
+
+```bash
+SCRIPT="$(command -v codeflow-light-capture || true)"
+[ -n "$SCRIPT" ] || SCRIPT="$HOME/.codex/skills/codeflow-light/scripts/codeflow_light_capture.py"
+[ -f "$SCRIPT" ] || SCRIPT="$HOME/.claude/skills/codeflow-light/scripts/codeflow_light_capture.py"
+```
+
+launcher는 설치된 앱을 우선 사용합니다.
+
+- macOS: `/Applications/Codeflow Light.app/Contents/MacOS/Codeflow Light`
+- Windows: `CODEFLOW_LIGHT_APP_EXECUTABLE` 또는 기본 설치 위치
+
+앱이 설치되어 있지 않으면 정상 사용자 경로에서는 capture가 실패합니다. 개발 중 repository-local Electron fallback을 사용하려면 명시적으로 켭니다.
+
+```bash
+CODEFLOW_LIGHT_ALLOW_DEV_LAUNCH=1 ./skill/bin/codeflow --project-root "$PWD"
+```
+
+## 화면
+
+**Session Flow**가 기본 화면입니다. 요청 group을 왼쪽에서 오른쪽으로 배치하고, Markdown Branch 요청은 Markdown 명령 -> 구현 -> 리뷰 -> 리뷰 반영 -> 검증 -> optional commit/push/merge 노드로 펼칩니다.
+
+파일은 주 그래프 노드가 아니라 오른쪽 상세 패널의 확인 정보입니다. 구현 node와 리뷰 반영 node를 클릭하면 해당 단계에서 실제로 생긴 raw added/deleted line을 볼 수 있고, 리뷰 node에서는 리뷰 결과 요약을 봅니다.
+
+## 개발과 패키징
+
+개발 모드:
 
 ```bash
 cd backend
@@ -104,9 +150,23 @@ npm install
 npm run dev
 ```
 
-## 사용 모드
+macOS DMG 빌드:
 
-**Session Flow**가 기본 화면입니다. Codex/Claude skill이 보낸 이벤트를 세션/요청 단위로 묶고, Markdown 브랜치 푸시/커밋 요청은 Markdown 명령 노드와 구현/리뷰/리뷰 반영/검증 루프 노드로 배치합니다. 왼쪽 패널은 전체 Markdown 명령 수와 루프 단계 수를 압축해서 보여주고, 오른쪽 패널은 선택한 단계의 요약과 파일별 삭제/추가 라인을 보여줍니다.
+```bash
+cd frontend
+npm run dist:mac
+```
+
+산출물은 `frontend/release/Codeflow-Light-<version>-<arch>.dmg`입니다. 이 파일은 Git에 커밋하지 말고 GitHub Release asset으로 업로드합니다.
+
+Windows portable EXE 빌드:
+
+```bash
+cd frontend
+npm run dist:win
+```
+
+산출물은 `frontend/release/Codeflow-Light-<version>-x64.exe`입니다.
 
 ## API
 
@@ -118,12 +178,13 @@ npm run dev
   "source": "branch",
   "session_id": "optional-stable-session-id",
   "workflow_id": "stable-id-for-this-user-command",
-  "run_id": "stable-id-for-one-markdown-file",
-  "skill": "markdown-branch-commit",
-  "markdown_path": "requests/01-ui.md",
+  "run_id": "stable-id-for-one-unit",
+  "skill": "general",
+  "command_label": "문서 정리",
   "step_kind": "implementation",
-  "step_summary": "SessionFlow가 구현/리뷰/리뷰 반영 node를 표시하도록 수정했습니다.",
-  "step_detail": "구현 단계에서 바뀐 내용을 설명합니다.",
+  "agent": "claude-code",
+  "step_summary": "README의 설치 흐름을 정리했습니다.",
+  "step_detail": "DMG 설치, 플러그인 연결, 호출 예시를 분리했습니다.",
   "step_status": "completed"
 }
 ```
@@ -132,42 +193,39 @@ npm run dev
 
 ### `POST /api/sessions/capture`
 
-```json
-{
-  "project_root": "/path/to/repo",
-  "source": "branch",
-  "user_prompt": "구현 후 리뷰 흐름을 시각화해줘",
-  "assistant_response": "구현 요약...",
-  "session_id": "optional-stable-session-id"
-}
-```
-
-응답은 `{ session_id, project_root, branch, groups, latest_group_id, summary }`입니다. 각 group에는 `phase`, `phase_label`, `summary`, `workflow_runs`, `graph`가 포함됩니다.
+이전 final-response 기반 fallback입니다. 새 리뷰 루프 기록에는 `/api/sessions/event`를 사용합니다.
 
 ### `POST /api/changes`
 
 저수준 diff 분석용 API입니다. `source`는 `working`, `staged`, `range`, `branch`를 지원합니다.
 
-## Codex / Claude Skill로 호출
+## 저장소 구조
 
-```bash
-mkdir -p ~/.codex/skills ~/.claude/skills
-ln -sfn "$PWD/skill" ~/.codex/skills/codeflow-light
-ln -sfn "$PWD/skill" ~/.claude/skills/codeflow-light
+```text
+codeflow-light/
+├── .codex-plugin/plugin.json             # Codex plugin manifest
+├── .claude-plugin/plugin.json            # Claude Code plugin manifest
+├── bin/                                  # plugin PATH wrappers
+├── backend/                              # FastAPI, 외부 LLM 호출 없음
+├── frontend/                             # Electron + Vite + React + @xyflow/react
+├── prompts/                              # portable prompt examples
+├── skill/                                # canonical Skill instructions + launcher
+└── skills/codeflow-light/                # plugin Skill wrapper
 ```
 
-이후 Codex/Claude Code에서 Markdown Branch skill과 `codeflow-light`를 함께 명시 호출하면 skill이 Electron 앱을 열고 `/api/sessions/event`로 각 단계를 저장합니다. `codeflow-light` 또는 `/codeflow-light`처럼 Codeflow Light를 단독으로 명시 호출한 경우에는 legacy `/api/sessions/capture` fallback으로 현재 diff를 저장할 수 있습니다. 일반 코드 수정, 리뷰, Markdown Branch workflow만으로는 Codeflow Light를 자동 실행하지 않습니다.
-
-skill의 capture script는 `CODEFLOW_LIGHT_EXECUTABLE`이 있으면 그 경로를 우선 사용하고, 없으면 `~/.codex/skills/codeflow-light/bin/codeflow` 또는 skill에 번들된 실행 파일을 사용합니다.
-
-## 테스트
+## 검증
 
 ```bash
-cd backend
-PYTHONPATH=. venv/bin/python -m pytest tests/ -v
+pytest -q backend/tests
 ```
 
 ```bash
 cd frontend
 npm run typecheck
+npm run build
+```
+
+```bash
+python3 ~/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py "$PWD"
+claude plugin validate .
 ```

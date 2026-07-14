@@ -89,6 +89,11 @@ class SessionWorkflowEventRequest(SessionCaptureRequest):
     step_summary: str = Field(default="", description="노드 상단에 표시할 요약")
     step_detail: str = Field(default="", description="노드 상세 패널에 표시할 설명")
     step_status: str = Field(default="completed", description="completed | skipped | pending | blocked | unknown")
+    agent: str = Field(
+        default="",
+        description="이 step을 수행한 도구/에이전트. 예: claude-code, codex. 구현과 리뷰 주체가 다를 때 구분합니다.",
+    )
+    agent_label: str = Field(default="", description="UI에 표시할 수행 주체 이름")
     files: list[str] = Field(default_factory=list, description="이 step과 직접 연결할 파일 목록")
 
 
@@ -275,6 +280,8 @@ async def sessions_event(request: SessionWorkflowEventRequest) -> dict:
         step_summary=request.step_summary,
         step_detail=clean_captured_text(request.step_detail),
         step_status=request.step_status,
+        agent=request.agent,
+        agent_label=request.agent_label,
         files=_event_files_scope(request.step_kind, request.files),
     )
 

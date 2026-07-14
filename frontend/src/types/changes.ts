@@ -107,6 +107,8 @@ export interface MarkdownWorkflowStep {
   summary: string;
   detail: string;
   status: MarkdownWorkflowStepStatus;
+  agent?: string;
+  agent_label?: string;
   files: string[];
   created_at?: string;
   sequence?: number;

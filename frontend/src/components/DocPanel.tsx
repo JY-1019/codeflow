@@ -2,6 +2,7 @@ import ReactMarkdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import { useEffect, useState, type ReactNode } from "react";
 import {
+  Bot,
   ChevronDown,
   CheckCircle2,
   CircleDashed,
@@ -17,6 +18,7 @@ import {
   Sparkles,
   XCircle,
 } from "lucide-react";
+import { agentDisplayLabel } from "@/flow/utils/agentLabel";
 import type {
   ChangeEdge,
   ChangeGraphResponse,
@@ -154,6 +156,7 @@ function WorkflowStepDoc({ item }: { item: SelectedWorkflowStepDetails }) {
   const removed = showsDiff ? sum(allFileNodes.map((node) => node.removed_lines)) : 0;
   const StatusIcon = statusIcon(step.status);
   const content = stepPrimaryContent(item);
+  const agentLabel = agentDisplayLabel(step.agent, step.agent_label);
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col overflow-y-auto p-3 text-[13px]">
@@ -168,6 +171,7 @@ function WorkflowStepDoc({ item }: { item: SelectedWorkflowStepDetails }) {
           <div className="mt-1 text-[12px] leading-relaxed text-slate-400">
             그룹 {group.sequence ?? ""} · {group.name}
             {run ? ` · ${workflowSkillLabel(run.skill, run.skill_label)}` : ""}
+            {agentLabel ? ` · ${agentLabel}` : ""}
           </div>
         </div>
         <span className={`inline-flex shrink-0 items-center gap-1 rounded px-2 py-1 text-[10px] ${statusClass(step.status)}`}>
@@ -340,6 +344,7 @@ function WorkflowStepList({ steps }: { steps: MarkdownWorkflowStep[] }) {
     <ol className="space-y-2">
       {steps.map((step, index) => {
         const StatusIcon = statusIcon(step.status);
+        const agentLabel = agentDisplayLabel(step.agent, step.agent_label);
         return (
           <li key={step.id} className="rounded-md border border-slate-800 bg-slate-900/45 px-3 py-2">
             <div className="flex items-start justify-between gap-2">
@@ -349,6 +354,15 @@ function WorkflowStepList({ steps }: { steps: MarkdownWorkflowStep[] }) {
                     {String(index + 1).padStart(2, "0")}
                   </span>
                   <span className="text-[12px] font-semibold text-slate-100">{step.label}</span>
+                  {agentLabel ? (
+                    <span
+                      className="inline-flex items-center gap-1 rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-300"
+                      title={`수행 주체: ${agentLabel}`}
+                    >
+                      <Bot className="h-3 w-3" />
+                      <span className="max-w-[96px] truncate">{agentLabel}</span>
+                    </span>
+                  ) : null}
                 </div>
                 <div className="mt-1 text-[12px] leading-relaxed text-slate-400">
                   {step.summary}
@@ -855,6 +869,8 @@ function workflowSkillLabel(skill: string, label?: string): string {
     "markdown-branch-push": "Markdown 브랜치 푸시",
     "markdown-branch-commit": "Markdown 브랜치 커밋",
     "captured-turn": "캡처된 턴",
+    "codeflow-light": "Codeflow 작업 기록",
+    general: "일반 작업 기록",
     "Markdown Branch Push": "Markdown 브랜치 푸시",
     "Markdown Branch Commit": "Markdown 브랜치 커밋",
     "Captured turn": "캡처된 턴",

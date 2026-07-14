@@ -84,6 +84,28 @@ def read_stdin_payload() -> dict[str, Any]:
     return parsed if isinstance(parsed, dict) else {}
 
 
+def detect_host_agent() -> str:
+    """Best-effort detection of the coding tool running this capture.
+
+    The host tool implements; review may be delegated to another agent, so the
+    caller can still override per-event with --agent. Claude Code and Codex set
+    their own session env vars, so we use those as the default actor.
+    """
+    for env_name in ("CODEX_THREAD_ID", "CODEX_SESSION_ID"):
+        if os.environ.get(env_name, "").strip():
+            return "codex"
+    for env_name in (
+        "CLAUDECODE_SESSION_ID",
+        "CLAUDE_CODE_SESSION_ID",
+        "CLAUDE_CODE_ENTRYPOINT",
+        "CLAUDECODE",
+        "CLAUDE_CODE",
+    ):
+        if os.environ.get(env_name, "").strip():
+            return "claude-code"
+    return ""
+
+
 def default_capture_session_id(raw_session_id: str, stdin_payload: dict[str, Any]) -> str:
     explicit = str(stdin_payload.get("session_id") or raw_session_id or "").strip()
     if explicit:
@@ -246,6 +268,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--step-kind", default="")
     parser.add_argument("--step-id", default="")
     parser.add_argument("--step-label", default="")
+    parser.add_argument("--agent", default="", help="claude-code, codex, ... who performed this step")
+    parser.add_argument("--agent-label", default="")
     parser.add_argument("--summary", default="")
     parser.add_argument("--detail", default="")
     parser.add_argument("--detail-file", default="")
@@ -316,6 +340,8 @@ def main() -> int:
                 or stdin_or_arg(stdin_payload, "detail", "")
             ),
             "step_status": stdin_or_arg(stdin_payload, "step_status", args.status),
+            "agent": stdin_or_arg(stdin_payload, "agent", args.agent) or detect_host_agent(),
+            "agent_label": stdin_or_arg(stdin_payload, "agent_label", args.agent_label),
             "files": read_list_arg(stdin_payload, "files", args.changed_file),
         }
         try:

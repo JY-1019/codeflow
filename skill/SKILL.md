@@ -5,7 +5,12 @@ description: |
   example with codeflow-light, /codeflow-light, or a direct request to open,
   show, or record Codeflow Light. Do not use it automatically for ordinary code
   changes, reviews, or Markdown Branch workflows unless the user also asks for
-  Codeflow Light. It launches/focuses the local Codeflow Light desktop app and
+  Codeflow Light. It works the same from Claude Code and from Codex, and records
+  which tool/agent performed each step, so a "Claude Code implements, then Codex
+  review plugin reviews" loop (or an implement/review loop repeated entirely in
+  Claude Code) stays traceable. When invoked on its own in a general request, it
+  also records ad-hoc work as a general capture even without a fixed Markdown
+  Branch format. It launches/focuses the local Codeflow Light desktop app and
   records implementation/review-loop events into the local backend. No LLM API
   is called by Codeflow Light.
 ---
@@ -21,6 +26,11 @@ become concrete nodes as soon as that phase completes. User-facing event
 summaries, review notes, status labels, and skill labels must be written in
 Korean. Files are not the primary graph nodes; they are shown in the right
 detail panel as raw deleted/added lines for implementation and review-fix nodes.
+This skill does not install the desktop app or DMG. It only launches/focuses an
+already installed Codeflow Light app and sends local capture events to it. If
+commit, push, or merge are not part of the user's requested workflow, skip those
+events or record them as skipped; implementation, review, review-fix, and
+verification are enough for normal review-loop tracking.
 The session stores:
 
 - `user_prompt`: the user's latest request, shown in the right doc panel when
@@ -49,7 +59,8 @@ not wait for the final response to describe the whole loop. Pick one stable
 After each phase completes, run the capture script with `--event-kind`:
 
 ```bash
-SCRIPT="$HOME/.codex/skills/codeflow-light/scripts/codeflow_light_capture.py"
+SCRIPT="$(command -v codeflow-light-capture || true)"
+[ -n "$SCRIPT" ] || SCRIPT="$HOME/.codex/skills/codeflow-light/scripts/codeflow_light_capture.py"
 [ -f "$SCRIPT" ] || SCRIPT="$HOME/.claude/skills/codeflow-light/scripts/codeflow_light_capture.py"
 WORKFLOW_ID="markdown-review-$(date +%Y%m%d%H%M%S)"
 
@@ -84,13 +95,16 @@ python3 "$SCRIPT" --project-root "$PWD" --event-kind implementation <<JSON
 JSON
 ```
 
-Record review as its own node, even when there are no findings:
+Record review as its own node, even when there are no findings. Set `agent` to
+the tool that actually ran the review — for example `codex` when the Codex
+review plugin reviews work that Claude Code implemented:
 
 ```bash
 python3 "$SCRIPT" --project-root "$PWD" --event-kind review <<JSON
 {
   "workflow_id": "$WORKFLOW_ID",
   "run_id": "<stable id for this markdown file>",
+  "agent": "codex",
   "step_summary": "<리뷰 결과를 한국어로 요약>",
   "step_detail": "<리뷰 지적사항 또는 조치할 지적사항이 없었다는 내용을 한국어로 설명>",
   "source": "branch"
@@ -113,10 +127,50 @@ python3 "$SCRIPT" --project-root "$PWD" --event-kind review_fix <<JSON
 JSON
 ```
 
-Then capture `verification`, `commit`, and for push workflows `push` and
-`merge` events as each phase succeeds or is skipped. Use `step_status:
-"skipped"` when the phase intentionally did not run, and `step_status:
-"blocked"` when the loop stops on a blocker.
+Then capture `verification`. Capture `commit`, and for push workflows `push`
+and `merge`, only when the workflow actually performs those phases. Use
+`step_status: "skipped"` when a phase is intentionally not run, and
+`step_status: "blocked"` when the loop stops on a blocker.
+
+## Cross-tool tracking (Claude Code + Codex)
+
+Each event accepts an `agent` field naming the tool that performed that step.
+When omitted, the capture script infers the host tool from the environment
+(`claude-code` or `codex`), so a loop run entirely inside one tool is labelled
+automatically. Set `agent` explicitly when the implement and review phases use
+different tools — for example Claude Code implements (`agent: "claude-code"`)
+and the in-Claude Codex review plugin reviews (`agent: "codex"`). Known agent
+slugs (`claude-code`, `codex`) get friendly labels; any other slug is shown
+as-is. Because `workflow_id`/`run_id` stay stable across the loop, repeating
+implement -> review -> review-fix in the same tool, or mixing tools per phase,
+both render as one traceable run with per-step actor badges.
+
+## General capture (no fixed workflow)
+
+When the user invokes Codeflow Light on its own in a general request that is not
+a Markdown Branch workflow, still record what was done. Use `skill: "general"`
+(or `skill: "codeflow-light"`), pick one `workflow_id` for the request and one
+`run_id` for the unit of work, set `command_label` to a short Korean title, and
+emit `implementation` / `review` / `verification` events as each part of the
+work completes:
+
+```bash
+WORKFLOW_ID="codeflow-general-$(date +%Y%m%d%H%M%S)"
+python3 "$SCRIPT" --project-root "$PWD" --event-kind implementation <<JSON
+{
+  "workflow_id": "$WORKFLOW_ID",
+  "run_id": "ad-hoc",
+  "skill": "general",
+  "command_label": "<무엇을 했는지 한국어 제목>",
+  "step_summary": "<한국어로 작업 요약>",
+  "step_detail": "<한국어로 세부 내용>",
+  "source": "working"
+}
+JSON
+```
+
+This records ad-hoc work as a normal session run, so the desktop app shows what
+was done and which tool did it even without a fixed Markdown Branch format.
 
 Capture is best-effort and must never block the implementation/review loop.
 Give each capture attempt a short window, about 20-30 seconds. If the app launch
@@ -144,7 +198,8 @@ The script will:
    without `--event-kind` still POST to `/api/sessions/capture`.
 
 Do not use repository-local `npm` or Python launch paths for normal usage. The
-installed DMG/EXE is the runtime surface. The repository-local development
+installed DMG/EXE is the runtime surface. This skill must not try to download
+or install a DMG/EXE on the user's behalf. The repository-local development
 fallback is available only when `CODEFLOW_LIGHT_ALLOW_DEV_LAUNCH=1` is
 explicitly set for local development.
 
@@ -192,8 +247,8 @@ If the packaged app is missing its bundled backend executable, it should be
 rebuilt from the correct target OS. Do not fall back to repository-local backend
 source for normal Skill usage.
 
-For Windows, point the skill at the packaged EXE when it is not installed in a
-default location:
+For Windows portable releases, point the skill at the packaged EXE so the
+plugin can launch it:
 
 ```powershell
 setx CODEFLOW_LIGHT_APP_EXECUTABLE "C:\path\to\Codeflow-Light-0.1.0-x64.exe"
@@ -210,6 +265,8 @@ available, the app falls back to repository + branch grouping.
 The backend does deterministic local summary only. To improve event nodes:
 
 - Write `step_summary`, `step_detail`, and review notes in Korean.
+- Set `agent` on each event so the flow shows which tool ran each phase,
+  especially when implementation and review use different tools.
 - Mention changed files in backticks, e.g. `frontend/src/pages/ChangePage.tsx`.
 - Describe behavior and intent, not syntax trivia.
 - Call out technical considerations such as state persistence, API contracts,

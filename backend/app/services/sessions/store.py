@@ -30,6 +30,19 @@ WORKFLOW_SKILL_LABELS = {
     "markdown-branch-push": "Markdown 브랜치 푸시",
     "markdown-branch-commit": "Markdown 브랜치 커밋",
     "captured-turn": "캡처된 턴",
+    "codeflow-light": "Codeflow 작업 기록",
+    "general": "일반 작업 기록",
+}
+
+# Which coding tool/agent actually performed a step. The host tool (Claude Code
+# or Codex) implements, while review can be delegated to another agent (e.g. the
+# Codex review plugin run from inside Claude Code), so this lives on the step.
+AGENT_LABELS = {
+    "claude-code": "Claude Code",
+    "claude": "Claude Code",
+    "codex": "Codex",
+    "codex-cli": "Codex",
+    "gpt-5": "Codex",
 }
 
 _LOCK = threading.Lock()
@@ -170,6 +183,8 @@ def append_workflow_event(
     step_summary: str = "",
     step_detail: str = "",
     step_status: str = "completed",
+    agent: str = "",
+    agent_label: str = "",
     files: Optional[list[str]] = None,
 ) -> dict[str, Any]:
     """Append one live workflow event to a persistent session group.
@@ -187,6 +202,8 @@ def append_workflow_event(
     resolved_run_id = resolve_workflow_run_id(run_id, markdown_path, markdown_title)
     normalized_kind = _clean_step_kind(step_kind)
     step_sequence = WORKFLOW_STEP_ORDER.get(normalized_kind, 500)
+    resolved_agent = _clean_agent(agent)
+    resolved_agent_label = _agent_label(resolved_agent, agent_label)
 
     with _LOCK:
         state = _read_state()
@@ -261,6 +278,8 @@ def append_workflow_event(
             "summary": step_summary.strip() or _default_step_summary(normalized_kind, step_files),
             "detail": step_detail.strip(),
             "status": _clean_status(step_status),
+            "agent": resolved_agent,
+            "agent_label": resolved_agent_label,
             "files": step_files,
             "created_at": now.isoformat(timespec="seconds"),
             "sequence": step_sequence,
@@ -569,6 +588,21 @@ def _clean_status(value: str) -> str:
     return cleaned if cleaned in {"completed", "skipped", "pending", "blocked", "unknown"} else "completed"
 
 
+def _clean_agent(value: str) -> str:
+    cleaned = "".join(ch if ch.isalnum() or ch in "._-" else "-" for ch in value.strip().lower())
+    cleaned = "-".join(part for part in cleaned.split("-") if part)
+    return cleaned[:60]
+
+
+def _agent_label(agent: str, label: str) -> str:
+    cleaned_label = label.strip()
+    if cleaned_label:
+        return cleaned_label
+    if not agent:
+        return ""
+    return AGENT_LABELS.get(agent, agent.replace("-", " ").replace("_", " ").strip().title())
+
+
 def _default_step_label(kind: str) -> str:
     return {
         "preflight": "사전 확인",
@@ -682,6 +716,10 @@ def _workflow_run_status(run: dict[str, Any], steps: list[dict[str, Any]]) -> st
     done = {"completed", "skipped"}
     if str(run.get("skill") or "") == "markdown-branch-push":
         if terminal_statuses.get("push") in done and terminal_statuses.get("merge") in done:
+            return "completed"
+        return "in_progress"
+    if str(run.get("skill") or "") in {"general", "codeflow-light"}:
+        if terminal_statuses.get("verification") in done:
             return "completed"
         return "in_progress"
     if terminal_statuses.get("commit") in done:

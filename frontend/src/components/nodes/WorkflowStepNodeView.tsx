@@ -1,6 +1,7 @@
 import { memo } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import {
+  Bot,
   CheckCircle2,
   CircleDashed,
   ClipboardList,
@@ -16,6 +17,7 @@ import {
   XCircle,
   type LucideIcon,
 } from "lucide-react";
+import { agentDisplayLabel } from "@/flow/utils/agentLabel";
 import type { MarkdownWorkflowStep, MarkdownWorkflowStepStatus } from "@/types/changes";
 
 export interface WorkflowStepNodeData extends MarkdownWorkflowStep {
@@ -32,6 +34,7 @@ export const WorkflowStepNodeView = memo(({ data, selected }: NodeProps) => {
   const phase = phaseConfig(step.kind);
   const StatusIcon = statusIcon(step.status);
   const StepIcon = phase.icon;
+  const agentLabel = agentDisplayLabel(step.agent, step.agent_label);
 
   return (
     <div
@@ -55,8 +58,19 @@ export const WorkflowStepNodeView = memo(({ data, selected }: NodeProps) => {
             {statusLabel(step.status)}
           </span>
         </div>
-        <div className="mt-1 truncate text-[10px] text-slate-400" title={step.runTitle || step.label}>
-          {step.runTitle || step.label}
+        <div className="mt-1 flex items-center justify-between gap-2">
+          <span className="min-w-0 truncate text-[10px] text-slate-400" title={step.runTitle || step.label}>
+            {step.runTitle || step.label}
+          </span>
+          {agentLabel ? (
+            <span
+              className="inline-flex shrink-0 items-center gap-1 rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-300"
+              title={`수행 주체: ${agentLabel}`}
+            >
+              <Bot className="h-3 w-3" />
+              <span className="max-w-[84px] truncate">{agentLabel}</span>
+            </span>
+          ) : null}
         </div>
       </div>
       <div className="px-3 py-2">

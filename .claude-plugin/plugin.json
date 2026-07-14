@@ -1,0 +1,16 @@
+{
+  "name": "codeflow-light",
+  "displayName": "Codeflow Light",
+  "description": "Capture Claude Code and Codex implementation/review loops into the local Codeflow Light desktop app.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Codeflow Light"
+  },
+  "skills": "./skills/",
+  "keywords": [
+    "codeflow",
+    "review",
+    "codex",
+    "claude-code"
+  ]
+}

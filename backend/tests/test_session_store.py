@@ -233,6 +233,108 @@ def test_append_workflow_event_builds_live_markdown_loop(tmp_path, monkeypatch):
     assert "graph" not in stored_group["workflow_events"][0]["step"]
 
 
+def test_workflow_event_tracks_per_step_agent(tmp_path, monkeypatch):
+    monkeypatch.setenv("CODEFLOW_LIGHT_STATE_DIR", str(tmp_path / "state"))
+    graph = {
+        "project_root": str(tmp_path),
+        "source": "branch",
+        "nodes": [],
+        "edges": [],
+    }
+    common = {
+        "project_root": str(tmp_path),
+        "graph": graph,
+        "session_id": "thread-agents",
+        "workflow_id": "workflow-agents",
+        "run_id": "request-md",
+        "skill": "markdown-branch-commit",
+    }
+
+    # Claude Code implements, then the Codex review plugin reviews the same run.
+    append_workflow_event(**common, step_kind="implementation", agent="claude-code")
+    result = append_workflow_event(**common, step_kind="review", agent="codex")
+
+    steps = result["groups"][0]["workflow_runs"][0]["steps"]
+    by_kind = {step["kind"]: step for step in steps}
+
+    assert by_kind["implementation"]["agent"] == "claude-code"
+    assert by_kind["implementation"]["agent_label"] == "Claude Code"
+    assert by_kind["review"]["agent"] == "codex"
+    assert by_kind["review"]["agent_label"] == "Codex"
+    # The agent must survive the response enrichment pass that the UI consumes.
+    assert get_latest_session(str(tmp_path), "thread-agents")["groups"][0][
+        "workflow_runs"
+    ][0]["steps"][0]["agent_label"] == "Claude Code"
+
+
+def test_workflow_event_agent_label_override_and_default(tmp_path, monkeypatch):
+    monkeypatch.setenv("CODEFLOW_LIGHT_STATE_DIR", str(tmp_path / "state"))
+    graph = {"project_root": str(tmp_path), "source": "branch", "nodes": [], "edges": []}
+
+    explicit = append_workflow_event(
+        project_root=str(tmp_path),
+        graph=graph,
+        session_id="thread-agent-label",
+        workflow_id="workflow-agent-label",
+        run_id="request-md",
+        step_kind="implementation",
+        agent="my-tool",
+        agent_label="사내 도구",
+    )
+    step = explicit["groups"][0]["workflow_runs"][0]["steps"][0]
+
+    assert step["agent"] == "my-tool"
+    assert step["agent_label"] == "사내 도구"
+
+
+def test_general_capture_skill_label_is_localized(tmp_path, monkeypatch):
+    monkeypatch.setenv("CODEFLOW_LIGHT_STATE_DIR", str(tmp_path / "state"))
+    graph = {"project_root": str(tmp_path), "source": "branch", "nodes": [], "edges": []}
+
+    result = append_workflow_event(
+        project_root=str(tmp_path),
+        graph=graph,
+        session_id="thread-general",
+        workflow_id="workflow-general",
+        run_id="ad-hoc",
+        skill="general",
+        command_label="버그 조사",
+        step_kind="implementation",
+        step_summary="원인을 찾고 수정했습니다.",
+        agent="claude-code",
+    )
+
+    run = result["groups"][0]["workflow_runs"][0]
+    assert run["skill_label"] == "일반 작업 기록"
+
+
+def test_general_capture_completes_on_verification(tmp_path, monkeypatch):
+    monkeypatch.setenv("CODEFLOW_LIGHT_STATE_DIR", str(tmp_path / "state"))
+    graph = {"project_root": str(tmp_path), "source": "branch", "nodes": [], "edges": []}
+    common = {
+        "project_root": str(tmp_path),
+        "graph": graph,
+        "session_id": "thread-general-complete",
+        "workflow_id": "workflow-general-complete",
+        "run_id": "ad-hoc",
+        "skill": "general",
+    }
+
+    after_implementation = append_workflow_event(
+        **common,
+        step_kind="implementation",
+        step_status="completed",
+    )
+    after_verification = append_workflow_event(
+        **common,
+        step_kind="verification",
+        step_status="completed",
+    )
+
+    assert after_implementation["groups"][0]["workflow_runs"][0]["status"] == "in_progress"
+    assert after_verification["groups"][0]["workflow_runs"][0]["status"] == "completed"
+
+
 def test_workflow_latest_graph_uses_default_markdown_run_id(tmp_path, monkeypatch):
     monkeypatch.setenv("CODEFLOW_LIGHT_STATE_DIR", str(tmp_path / "state"))
     graph = {
