@@ -6,7 +6,7 @@ import type {
   CodexUsageResponse,
 } from "@/types/changes";
 
-const packagedRendererProtocols = new Set(["file:", "codeflow-light:"]);
+const packagedRendererProtocols = new Set(["file:", "codeflow:"]);
 const apiBaseURL = packagedRendererProtocols.has(window.location.protocol)
   ? "http://127.0.0.1:8019/api"
   : "/api";

@@ -1,5 +1,5 @@
 {
-  "name": "codeflow-light-frontend",
+  "name": "codeflow-frontend",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -39,9 +39,9 @@
     "vite": "^6.0.1"
   },
   "build": {
-    "appId": "dev.codeflow.light",
-    "productName": "Codeflow Light",
-    "artifactName": "Codeflow-Light-${version}-${arch}.${ext}",
+    "appId": "dev.codeflow",
+    "productName": "Codeflow",
+    "artifactName": "Codeflow-${version}-${arch}.${ext}",
     "icon": "assets/icon.icns",
     "publish": null,
     "directories": {
@@ -72,7 +72,8 @@
         "from": "backend-bin",
         "to": "backend-bin",
         "filter": [
-          "**/*"
+          "codeflow-backend",
+          "codeflow-backend.exe"
         ]
       }
     ],
@@ -96,7 +97,7 @@
       "requestedExecutionLevel": "asInvoker"
     },
     "dmg": {
-      "title": "Codeflow Light",
+      "title": "Codeflow",
       "icon": "assets/icon.icns"
     }
   }

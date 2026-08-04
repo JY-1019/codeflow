@@ -1,7 +1,7 @@
 [project]
-name = "codeflow-light-backend"
+name = "codeflow-backend"
 version = "0.1.0"
-description = "Codeflow Light backend - visualize LLM (Codex/Claude Code) code change responses"
+description = "Codeflow backend - visualize LLM (Codex/Claude Code) code change responses"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.115.0",

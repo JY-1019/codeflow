@@ -1,9 +1,9 @@
 {
-  "name": "codeflow-light",
+  "name": "codeflow",
   "version": "0.1.0",
-  "description": "Capture Codex and Claude Code implementation/review loops into the local Codeflow Light desktop app.",
+  "description": "Capture Codex and Claude Code implementation/review loops into the local Codeflow desktop app.",
   "author": {
-    "name": "Codeflow Light"
+    "name": "Codeflow"
   },
   "license": "MIT",
   "keywords": [
@@ -14,18 +14,18 @@
   ],
   "skills": "./skills/",
   "interface": {
-    "displayName": "Codeflow Light",
+    "displayName": "Codeflow",
     "shortDescription": "Visualize implementation and review loops locally.",
-    "longDescription": "Codeflow Light launches the local desktop app and records implementation, review, review-fix, verification, commit, push, and merge events from Codex or Claude Code without calling an external LLM API.",
-    "developerName": "Codeflow Light",
+    "longDescription": "Codeflow launches the local desktop app and records implementation, review, review-fix, verification, commit, push, and merge events from Codex or Claude Code without calling an external LLM API.",
+    "developerName": "Codeflow",
     "category": "Productivity",
     "capabilities": [
       "Interactive",
       "Write"
     ],
     "defaultPrompt": [
-      "codeflow-light로 이번 리뷰 루프를 기록해줘",
-      "Codeflow Light를 열고 현재 작업 흐름을 보여줘"
+      "codeflow로 이번 리뷰 루프를 기록해줘",
+      "Codeflow를 열고 현재 작업 흐름을 보여줘"
     ],
     "brandColor": "#2563EB"
   }

@@ -186,7 +186,7 @@ def test_changes_latest_defaults_to_branch_diff(tmp_path: Path, monkeypatch):
     _run(["git", "add", "lib.py"], repo)
     _run(["git", "commit", "-q", "-m", "feature change"], repo)
 
-    monkeypatch.setenv("CODEFLOW_LIGHT_PROJECT_ROOT", str(repo))
+    monkeypatch.setenv("CODEFLOW_PROJECT_ROOT", str(repo))
 
     from app.routers import changes as changes_router
     from fastapi.testclient import TestClient

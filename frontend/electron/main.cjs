@@ -9,7 +9,7 @@ const { pathToFileURL } = require("node:url");
 const API_HOST = "127.0.0.1";
 const API_PORT = 8019;
 const API_HEALTH_URL = `http://${API_HOST}:${API_PORT}/api/health`;
-const APP_PROTOCOL = "codeflow-light";
+const APP_PROTOCOL = "codeflow";
 const APP_HOST = "app";
 
 protocol.registerSchemesAsPrivileged([
@@ -30,11 +30,11 @@ let appProtocolRegistered = false;
 const windowsBySession = new Map();
 
 const launchContext = () => {
-  const sessionId = process.env.CODEFLOW_LIGHT_SESSION_ID || "";
+  const sessionId = process.env.CODEFLOW_SESSION_ID || "";
   return {
-    projectRoot: process.env.CODEFLOW_LIGHT_PROJECT_ROOT || process.env.PWD || repoRoot(),
+    projectRoot: process.env.CODEFLOW_PROJECT_ROOT || process.env.PWD || repoRoot(),
     sessionId,
-    sessionTitle: process.env.CODEFLOW_LIGHT_SESSION_TITLE || codexThreadName(sessionId),
+    sessionTitle: process.env.CODEFLOW_SESSION_TITLE || codexThreadName(sessionId),
   };
 };
 
@@ -58,11 +58,11 @@ function backendDir() {
 }
 
 function backendExecutableName() {
-  return process.platform === "win32" ? "codeflow-light-backend.exe" : "codeflow-light-backend";
+  return process.platform === "win32" ? "codeflow-backend.exe" : "codeflow-backend";
 }
 
 function packagedBackendExecutable() {
-  const configured = process.env.CODEFLOW_LIGHT_BACKEND_EXECUTABLE;
+  const configured = process.env.CODEFLOW_BACKEND_EXECUTABLE;
   if (configured && fs.existsSync(configured)) return configured;
 
   const candidates = [
@@ -120,7 +120,7 @@ function ensureBackendPython() {
     if (!created) return systemPythonFallback();
   }
 
-  const marker = path.join(venvDir, ".codeflow-light-installed");
+  const marker = path.join(venvDir, ".codeflow-installed");
   if (!fs.existsSync(marker)) {
     spawnSync(venvPython, ["-m", "pip", "install", "--upgrade", "pip"], { stdio: "ignore" });
     const installed = spawnSync(venvPython, ["-m", "pip", "install", backendDir()], {
@@ -220,13 +220,13 @@ async function ensureBackend(projectRoot) {
     ...process.env,
     HOST: API_HOST,
     PORT: String(API_PORT),
-    CODEFLOW_LIGHT_PROJECT_ROOT: projectRoot || process.env.PWD || repoRoot(),
+    CODEFLOW_PROJECT_ROOT: projectRoot || process.env.PWD || repoRoot(),
   };
 
   const backendExecutable = packagedBackendExecutable();
   if (app.isPackaged && !backendExecutable) {
     throw new Error(
-      "Packaged Codeflow Light is missing its bundled backend executable. " +
+      "Packaged Codeflow is missing its bundled backend executable. " +
         "Rebuild the app with npm run build:backend before packaging."
     );
   }
@@ -271,7 +271,7 @@ function createWindow(context) {
     minWidth: 1100,
     minHeight: 720,
     backgroundColor: "#020617",
-    title: `Codeflow Light${titleSuffix}`,
+    title: `Codeflow${titleSuffix}`,
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -381,7 +381,7 @@ function codexHome() {
 }
 
 function logLaunchError(error) {
-  console.error("[codeflow-light] failed to open/focus window", error);
+  console.error("[codeflow] failed to open/focus window", error);
 }
 
 app.whenReady().then(async () => {

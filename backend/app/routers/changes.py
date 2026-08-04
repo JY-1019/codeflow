@@ -39,7 +39,7 @@ _LATEST_RESULTS: dict[str, dict] = {}
 class ChangesRequest(BaseModel):
     project_root: Optional[str] = Field(
         default=None,
-        description="git 저장소 경로. 비우면 환경변수 CODEFLOW_LIGHT_PROJECT_ROOT 또는 서버 CWD 사용.",
+        description="git 저장소 경로. 비우면 환경변수 CODEFLOW_PROJECT_ROOT 또는 서버 CWD 사용.",
     )
     source: str = Field(default="working", description="working | staged | range | branch")
     base_ref: Optional[str] = None
@@ -100,7 +100,7 @@ class SessionWorkflowEventRequest(SessionCaptureRequest):
 def _resolve_project_root(raw: Optional[str]) -> str:
     if raw and raw.strip():
         return raw.strip()
-    env_root = os.getenv("CODEFLOW_LIGHT_PROJECT_ROOT", "").strip()
+    env_root = os.getenv("CODEFLOW_PROJECT_ROOT", "").strip()
     if env_root:
         return env_root
     return str(Path.cwd())

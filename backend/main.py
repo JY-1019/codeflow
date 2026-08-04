@@ -1,4 +1,4 @@
-"""Codeflow Light backend entry point."""
+"""Codeflow backend entry point."""
 from __future__ import annotations
 
 import os
@@ -20,12 +20,12 @@ from app.routers import changes, health  # noqa: E402
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("Codeflow Light backend starting on port", os.getenv("PORT", "8019"))
+    print("Codeflow backend starting on port", os.getenv("PORT", "8019"))
     yield
-    print("Codeflow Light backend shutting down.")
+    print("Codeflow backend shutting down.")
 
 
-app = FastAPI(title="Codeflow Light API", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="Codeflow API", version="0.1.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -33,7 +33,7 @@ app.add_middleware(
         "http://127.0.0.1:5174",
         "http://localhost:5173",
         "http://127.0.0.1:5173",
-        "codeflow-light://app",
+        "codeflow://app",
     ],
     allow_credentials=True,
     allow_methods=["*"],

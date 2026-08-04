@@ -4,7 +4,7 @@ Goal: for each changed hunk, identify which function/class/method it lives in
 so we can build a node-per-symbol graph instead of a node-per-file graph.
 
 We use cheap regex-based detection rather than parsing a full AST. This is
-intentional — codeflow-light should not require tree-sitter or language-specific
+intentional — codeflow should not require tree-sitter or language-specific
 toolchains. For unknown languages we fall back to file-level nodes.
 """
 from __future__ import annotations

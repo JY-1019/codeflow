@@ -18,8 +18,151 @@ def _run(cmd: list[str], cwd) -> None:
     subprocess.run(cmd, cwd=str(cwd), check=True, capture_output=True)
 
 
+def test_default_state_dir_migrates_existing_history(tmp_path, monkeypatch):
+    monkeypatch.delenv("CODEFLOW_STATE_DIR", raising=False)
+    monkeypatch.delenv("CODEFLOW_LIGHT_STATE_DIR", raising=False)
+    monkeypatch.setenv("HOME", str(tmp_path))
+    legacy_dir = tmp_path / ".codeflow-light"
+    legacy_dir.mkdir()
+    legacy_dir.joinpath("sessions.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "latest_session_id": "legacy-thread",
+                "sessions": {
+                    "legacy-thread": {
+                        "id": "legacy-thread",
+                        "project_root": str(tmp_path),
+                        "branch": "main",
+                        "groups": [
+                            {
+                                "id": "legacy-group",
+                                "name": "기존 기록",
+                                "created_at": "2026-01-01T00:00:00+09:00",
+                                "project_root": str(tmp_path),
+                                "user_prompt": "기존 요청",
+                                "assistant_response": "",
+                                "graph": {"nodes": [], "edges": []},
+                                "workflow_runs": [
+                                    {
+                                        "id": "legacy-run",
+                                        "skill": "codeflow-light",
+                                        "skill_label": "Codeflow Light",
+                                        "status": "completed",
+                                        "steps": [],
+                                    }
+                                ],
+                            }
+                        ],
+                        "latest_group_id": "legacy-group",
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = get_latest_session(str(tmp_path), "legacy-thread")
+    stored = json.loads((tmp_path / ".codeflow" / "sessions.json").read_text())
+    run = stored["sessions"]["legacy-thread"]["groups"][0]["workflow_runs"][0]
+
+    assert result["session_id"] == "legacy-thread"
+    assert run["skill"] == "codeflow"
+    assert run["skill_label"] == "Codeflow"
+    assert not legacy_dir.exists()
+
+
+def test_state_migration_uses_custom_legacy_directory(tmp_path, monkeypatch):
+    legacy_dir = tmp_path / "custom-old-state"
+    target_dir = tmp_path / "missing-parent" / "custom-new-state"
+    monkeypatch.setenv("CODEFLOW_LIGHT_STATE_DIR", str(legacy_dir))
+    monkeypatch.setenv("CODEFLOW_STATE_DIR", str(target_dir))
+    legacy_dir.mkdir()
+    legacy_dir.joinpath("sessions.json").write_text(
+        json.dumps(
+            {
+                "latest_session_id": "custom-thread",
+                "sessions": {
+                    "custom-thread": {
+                        "id": "custom-thread",
+                        "project_root": str(tmp_path),
+                        "groups": [],
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = get_latest_session(str(tmp_path), "custom-thread")
+
+    assert result["session_id"] == "custom-thread"
+    assert target_dir.joinpath("sessions.json").exists()
+    assert not legacy_dir.exists()
+
+
+def test_state_migration_does_not_delete_symlinked_active_state(tmp_path, monkeypatch):
+    legacy_dir = tmp_path / "state"
+    legacy_dir.mkdir()
+    legacy_dir.joinpath("sessions.json").write_text(
+        json.dumps({"latest_session_id": None, "sessions": {}}), encoding="utf-8"
+    )
+    alias = tmp_path / "state-alias"
+    alias.symlink_to(legacy_dir, target_is_directory=True)
+    monkeypatch.setenv("CODEFLOW_LIGHT_STATE_DIR", str(legacy_dir))
+    monkeypatch.setenv("CODEFLOW_STATE_DIR", str(alias))
+
+    get_latest_session(str(tmp_path))
+
+    assert legacy_dir.joinpath("sessions.json").exists()
+
+
+def test_state_migration_merges_collisions_idempotently(tmp_path, monkeypatch):
+    monkeypatch.delenv("CODEFLOW_STATE_DIR", raising=False)
+    monkeypatch.delenv("CODEFLOW_LIGHT_STATE_DIR", raising=False)
+    monkeypatch.setenv("HOME", str(tmp_path))
+    states = {}
+    for directory, marker in ((".codeflow", "new"), (".codeflow-light", "old")):
+        state_dir = tmp_path / directory
+        state_dir.mkdir()
+        session = {
+            "id": "shared-thread",
+            "project_root": str(tmp_path),
+            "groups": [
+                {
+                    "id": "shared-group",
+                    "name": marker,
+                    "project_root": str(tmp_path),
+                    "graph": {"nodes": [], "edges": []},
+                }
+            ],
+        }
+        if marker == "old":
+            session["latest_group_id"] = "shared-group"
+        states[directory] = {
+            "schema_version": 1,
+            "latest_session_id": "shared-thread",
+            "sessions": {"shared-thread": session},
+        }
+        state_dir.joinpath("sessions.json").write_text(json.dumps(states[directory]), encoding="utf-8")
+
+    result = get_latest_session(str(tmp_path), "shared-thread")
+    assert [group["name"] for group in result["groups"]] == ["new", "old"]
+    assert result["latest_group_id"] == "shared-group-legacy-1"
+    assert not (tmp_path / ".codeflow-light").exists()
+
+    legacy_dir = tmp_path / ".codeflow-light"
+    legacy_dir.mkdir()
+    legacy_dir.joinpath("sessions.json").write_text(
+        json.dumps(states[".codeflow-light"]), encoding="utf-8"
+    )
+    repeated = get_latest_session(str(tmp_path), "shared-thread")
+
+    assert [group["name"] for group in repeated["groups"]] == ["new", "old"]
+
+
 def test_append_group_persists_latest_session(tmp_path, monkeypatch):
-    monkeypatch.setenv("CODEFLOW_LIGHT_STATE_DIR", str(tmp_path / "state"))
+    monkeypatch.setenv("CODEFLOW_STATE_DIR", str(tmp_path / "state"))
     graph = {
         "project_root": str(tmp_path),
         "source": "working",
@@ -46,7 +189,7 @@ def test_append_group_persists_latest_session(tmp_path, monkeypatch):
 
 
 def test_latest_session_can_be_filtered_by_session_id(tmp_path, monkeypatch):
-    monkeypatch.setenv("CODEFLOW_LIGHT_STATE_DIR", str(tmp_path / "state"))
+    monkeypatch.setenv("CODEFLOW_STATE_DIR", str(tmp_path / "state"))
     graph = {
         "project_root": str(tmp_path),
         "source": "working",
@@ -78,7 +221,7 @@ def test_latest_session_can_be_filtered_by_session_id(tmp_path, monkeypatch):
 
 
 def test_latest_session_project_filter_does_not_return_other_project(tmp_path, monkeypatch):
-    monkeypatch.setenv("CODEFLOW_LIGHT_STATE_DIR", str(tmp_path / "state"))
+    monkeypatch.setenv("CODEFLOW_STATE_DIR", str(tmp_path / "state"))
     first_project = tmp_path / "repo-one"
     second_project = tmp_path / "repo-two"
     first_project.mkdir()
@@ -100,7 +243,7 @@ def test_latest_session_project_filter_does_not_return_other_project(tmp_path, m
 
 
 def test_missing_explicit_session_id_has_no_previous_full_graph(tmp_path, monkeypatch):
-    monkeypatch.setenv("CODEFLOW_LIGHT_STATE_DIR", str(tmp_path / "state"))
+    monkeypatch.setenv("CODEFLOW_STATE_DIR", str(tmp_path / "state"))
     project = tmp_path / "repo"
     project.mkdir()
     graph = {
@@ -122,7 +265,7 @@ def test_missing_explicit_session_id_has_no_previous_full_graph(tmp_path, monkey
 
 
 def test_sessions_latest_normalizes_subdirectory_project_root(tmp_path, monkeypatch):
-    monkeypatch.setenv("CODEFLOW_LIGHT_STATE_DIR", str(tmp_path / "state"))
+    monkeypatch.setenv("CODEFLOW_STATE_DIR", str(tmp_path / "state"))
     repo = tmp_path / "repo"
     subdir = repo / "frontend"
     subdir.mkdir(parents=True)
@@ -154,7 +297,7 @@ def test_sessions_latest_normalizes_subdirectory_project_root(tmp_path, monkeypa
 
 
 def test_append_workflow_event_builds_live_markdown_loop(tmp_path, monkeypatch):
-    monkeypatch.setenv("CODEFLOW_LIGHT_STATE_DIR", str(tmp_path / "state"))
+    monkeypatch.setenv("CODEFLOW_STATE_DIR", str(tmp_path / "state"))
     graph = {
         "project_root": str(tmp_path),
         "source": "branch",
@@ -233,42 +376,98 @@ def test_append_workflow_event_builds_live_markdown_loop(tmp_path, monkeypatch):
     assert "graph" not in stored_group["workflow_events"][0]["step"]
 
 
-def test_workflow_event_tracks_per_step_agent(tmp_path, monkeypatch):
-    monkeypatch.setenv("CODEFLOW_LIGHT_STATE_DIR", str(tmp_path / "state"))
+def test_workflow_event_tracks_all_tool_pairings_and_git_agents(tmp_path, monkeypatch):
+    monkeypatch.setenv("CODEFLOW_STATE_DIR", str(tmp_path / "state"))
     graph = {
         "project_root": str(tmp_path),
         "source": "branch",
         "nodes": [],
         "edges": [],
     }
-    common = {
+    pairings = [
+        ("claude-code", "codex"),
+        ("codex", "codex"),
+        ("claude-code", "claude-code"),
+        ("codex", "claude-code"),
+    ]
+
+    for index, (implementer, reviewer) in enumerate(pairings):
+        common = {
+            "project_root": str(tmp_path),
+            "graph": graph,
+            "session_id": f"thread-agents-{index}",
+            "workflow_id": f"workflow-agents-{index}",
+            "run_id": "request-md",
+            "skill": "markdown-branch-commit",
+        }
+        append_workflow_event(
+            **common,
+            step_id="implementation",
+            step_kind="implementation",
+            agent=implementer,
+        )
+        result = append_workflow_event(
+            **common,
+            step_id="review",
+            step_kind="review",
+            agent=reviewer,
+        )
+        steps = result["groups"][0]["workflow_runs"][0]["steps"]
+
+        assert [(step["kind"], step["agent"]) for step in steps] == [
+            ("implementation", implementer),
+            ("review", reviewer),
+        ]
+        assert [step["agent_label"] for step in steps] == [
+            "Claude Code" if implementer == "claude-code" else "Codex",
+            "Claude Code" if reviewer == "claude-code" else "Codex",
+        ]
+
+    append_workflow_event(
+        project_root=str(tmp_path),
+        graph=graph,
+        session_id="thread-agents-0",
+        workflow_id="workflow-agents-0",
+        run_id="request-md",
+        step_id="implementation",
+        step_kind="implementation",
+        step_summary="stable step update",
+    )
+    persisted_steps = get_latest_session(str(tmp_path), "thread-agents-0")["groups"][0][
+        "workflow_runs"
+    ][0]["steps"]
+    assert persisted_steps[0]["agent"] == "claude-code"
+    assert persisted_steps[0]["agent_label"] == "Claude Code"
+
+    git_common = {
         "project_root": str(tmp_path),
         "graph": graph,
-        "session_id": "thread-agents",
-        "workflow_id": "workflow-agents",
+        "session_id": "thread-git-agents",
+        "workflow_id": "workflow-git-agents",
         "run_id": "request-md",
-        "skill": "markdown-branch-commit",
+        "skill": "markdown-branch-push",
     }
+    result = None
+    for kind, agent in [
+        ("branch", "claude-code"),
+        ("commit", "claude-code"),
+        ("push", "codex"),
+        ("merge", "codex"),
+    ]:
+        result = append_workflow_event(**git_common, step_kind=kind, agent=agent)
 
-    # Claude Code implements, then the Codex review plugin reviews the same run.
-    append_workflow_event(**common, step_kind="implementation", agent="claude-code")
-    result = append_workflow_event(**common, step_kind="review", agent="codex")
-
+    assert result is not None
     steps = result["groups"][0]["workflow_runs"][0]["steps"]
-    by_kind = {step["kind"]: step for step in steps}
-
-    assert by_kind["implementation"]["agent"] == "claude-code"
-    assert by_kind["implementation"]["agent_label"] == "Claude Code"
-    assert by_kind["review"]["agent"] == "codex"
-    assert by_kind["review"]["agent_label"] == "Codex"
-    # The agent must survive the response enrichment pass that the UI consumes.
-    assert get_latest_session(str(tmp_path), "thread-agents")["groups"][0][
-        "workflow_runs"
-    ][0]["steps"][0]["agent_label"] == "Claude Code"
+    assert [(step["kind"], step["agent"]) for step in steps] == [
+        ("branch", "claude-code"),
+        ("commit", "claude-code"),
+        ("push", "codex"),
+        ("merge", "codex"),
+    ]
 
 
 def test_workflow_event_agent_label_override_and_default(tmp_path, monkeypatch):
-    monkeypatch.setenv("CODEFLOW_LIGHT_STATE_DIR", str(tmp_path / "state"))
+    monkeypatch.setenv("CODEFLOW_STATE_DIR", str(tmp_path / "state"))
     graph = {"project_root": str(tmp_path), "source": "branch", "nodes": [], "edges": []}
 
     explicit = append_workflow_event(
@@ -277,6 +476,7 @@ def test_workflow_event_agent_label_override_and_default(tmp_path, monkeypatch):
         session_id="thread-agent-label",
         workflow_id="workflow-agent-label",
         run_id="request-md",
+        step_id="implementation",
         step_kind="implementation",
         agent="my-tool",
         agent_label="사내 도구",
@@ -286,9 +486,23 @@ def test_workflow_event_agent_label_override_and_default(tmp_path, monkeypatch):
     assert step["agent"] == "my-tool"
     assert step["agent_label"] == "사내 도구"
 
+    updated = append_workflow_event(
+        project_root=str(tmp_path),
+        graph=graph,
+        session_id="thread-agent-label",
+        workflow_id="workflow-agent-label",
+        run_id="request-md",
+        step_id="implementation",
+        step_kind="implementation",
+        agent="my-tool",
+    )
+    updated_step = updated["groups"][0]["workflow_runs"][0]["steps"][0]
+
+    assert updated_step["agent_label"] == "사내 도구"
+
 
 def test_general_capture_skill_label_is_localized(tmp_path, monkeypatch):
-    monkeypatch.setenv("CODEFLOW_LIGHT_STATE_DIR", str(tmp_path / "state"))
+    monkeypatch.setenv("CODEFLOW_STATE_DIR", str(tmp_path / "state"))
     graph = {"project_root": str(tmp_path), "source": "branch", "nodes": [], "edges": []}
 
     result = append_workflow_event(
@@ -309,7 +523,7 @@ def test_general_capture_skill_label_is_localized(tmp_path, monkeypatch):
 
 
 def test_general_capture_completes_on_verification(tmp_path, monkeypatch):
-    monkeypatch.setenv("CODEFLOW_LIGHT_STATE_DIR", str(tmp_path / "state"))
+    monkeypatch.setenv("CODEFLOW_STATE_DIR", str(tmp_path / "state"))
     graph = {"project_root": str(tmp_path), "source": "branch", "nodes": [], "edges": []}
     common = {
         "project_root": str(tmp_path),
@@ -336,7 +550,7 @@ def test_general_capture_completes_on_verification(tmp_path, monkeypatch):
 
 
 def test_workflow_latest_graph_uses_default_markdown_run_id(tmp_path, monkeypatch):
-    monkeypatch.setenv("CODEFLOW_LIGHT_STATE_DIR", str(tmp_path / "state"))
+    monkeypatch.setenv("CODEFLOW_STATE_DIR", str(tmp_path / "state"))
     graph = {
         "project_root": str(tmp_path),
         "source": "branch",
@@ -363,7 +577,7 @@ def test_workflow_latest_graph_uses_default_markdown_run_id(tmp_path, monkeypatc
 
 
 def test_workflow_event_step_graph_is_scoped_to_files(tmp_path, monkeypatch):
-    monkeypatch.setenv("CODEFLOW_LIGHT_STATE_DIR", str(tmp_path / "state"))
+    monkeypatch.setenv("CODEFLOW_STATE_DIR", str(tmp_path / "state"))
     graph = {
         "project_root": str(tmp_path),
         "source": "branch",
@@ -679,7 +893,7 @@ def test_explicit_workflow_phase_uses_event_order_for_repeated_loop():
 
 
 def test_markdown_branch_push_requires_push_and_merge_to_complete(tmp_path, monkeypatch):
-    monkeypatch.setenv("CODEFLOW_LIGHT_STATE_DIR", str(tmp_path / "state"))
+    monkeypatch.setenv("CODEFLOW_STATE_DIR", str(tmp_path / "state"))
     graph = {
         "project_root": str(tmp_path),
         "source": "branch",
@@ -705,7 +919,7 @@ def test_markdown_branch_push_requires_push_and_merge_to_complete(tmp_path, monk
 
 
 def test_workflow_event_update_keeps_group_as_latest(tmp_path, monkeypatch):
-    monkeypatch.setenv("CODEFLOW_LIGHT_STATE_DIR", str(tmp_path / "state"))
+    monkeypatch.setenv("CODEFLOW_STATE_DIR", str(tmp_path / "state"))
     graph = {
         "project_root": str(tmp_path),
         "source": "branch",
@@ -730,7 +944,7 @@ def test_workflow_event_update_keeps_group_as_latest(tmp_path, monkeypatch):
 
 
 def test_repeated_review_loop_preserves_event_order(tmp_path, monkeypatch):
-    monkeypatch.setenv("CODEFLOW_LIGHT_STATE_DIR", str(tmp_path / "state"))
+    monkeypatch.setenv("CODEFLOW_STATE_DIR", str(tmp_path / "state"))
     graph = {
         "project_root": str(tmp_path),
         "source": "branch",
@@ -765,7 +979,7 @@ def test_repeated_review_loop_preserves_event_order(tmp_path, monkeypatch):
 
 
 def test_missing_workflow_id_uses_unique_fallback_group(tmp_path, monkeypatch):
-    monkeypatch.setenv("CODEFLOW_LIGHT_STATE_DIR", str(tmp_path / "state"))
+    monkeypatch.setenv("CODEFLOW_STATE_DIR", str(tmp_path / "state"))
     graph = {
         "project_root": str(tmp_path),
         "source": "branch",
@@ -790,7 +1004,7 @@ def test_missing_workflow_id_uses_unique_fallback_group(tmp_path, monkeypatch):
 
 
 def test_markdown_branch_commit_completes_on_commit(tmp_path, monkeypatch):
-    monkeypatch.setenv("CODEFLOW_LIGHT_STATE_DIR", str(tmp_path / "state"))
+    monkeypatch.setenv("CODEFLOW_STATE_DIR", str(tmp_path / "state"))
     graph = {
         "project_root": str(tmp_path),
         "source": "branch",
@@ -820,7 +1034,7 @@ def test_cors_allows_app_protocol_without_null_origin():
     allowed = client.options(
         "/api/health",
         headers={
-            "Origin": "codeflow-light://app",
+            "Origin": "codeflow://app",
             "Access-Control-Request-Method": "GET",
         },
     )
@@ -832,5 +1046,5 @@ def test_cors_allows_app_protocol_without_null_origin():
         },
     )
 
-    assert allowed.headers["access-control-allow-origin"] == "codeflow-light://app"
+    assert allowed.headers["access-control-allow-origin"] == "codeflow://app"
     assert "access-control-allow-origin" not in blocked.headers

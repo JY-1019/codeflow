@@ -1,4 +1,4 @@
-"""Lean git diff collection for codeflow-light.
+"""Lean git diff collection for codeflow.
 
 Supports three change sources:
   - working: uncommitted changes vs HEAD (default)

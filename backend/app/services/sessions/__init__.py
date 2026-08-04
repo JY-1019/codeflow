@@ -1,1 +1,1 @@
-"""Session/group persistence for Codeflow Light."""
+"""Session/group persistence for Codeflow."""

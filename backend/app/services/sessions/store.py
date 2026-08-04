@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import shutil
 import subprocess
 import threading
 from copy import deepcopy
@@ -30,7 +31,7 @@ WORKFLOW_SKILL_LABELS = {
     "markdown-branch-push": "Markdown 브랜치 푸시",
     "markdown-branch-commit": "Markdown 브랜치 커밋",
     "captured-turn": "캡처된 턴",
-    "codeflow-light": "Codeflow 작업 기록",
+    "codeflow": "Codeflow 작업 기록",
     "general": "일반 작업 기록",
 }
 
@@ -48,9 +49,16 @@ AGENT_LABELS = {
 _LOCK = threading.Lock()
 
 
+def _empty_state() -> dict[str, Any]:
+    return {"schema_version": 1, "latest_session_id": None, "sessions": {}}
+
+
 def _state_dir() -> Path:
-    raw = os.getenv("CODEFLOW_LIGHT_STATE_DIR", "~/.codeflow-light")
-    path = Path(raw).expanduser()
+    configured = os.getenv("CODEFLOW_STATE_DIR", "").strip()
+    path = Path(configured or "~/.codeflow").expanduser()
+    legacy_configured = os.getenv("CODEFLOW_LIGHT_STATE_DIR", "").strip()
+    legacy = Path(legacy_configured or "~/.codeflow-light").expanduser()
+    _migrate_legacy_state(path, legacy)
     path.mkdir(parents=True, exist_ok=True)
     return path
 
@@ -59,31 +67,157 @@ def _state_file() -> Path:
     return _state_dir() / "sessions.json"
 
 
-def _empty_state() -> dict[str, Any]:
-    return {"schema_version": 1, "latest_session_id": None, "sessions": {}}
+def _migrate_legacy_state(path: Path, legacy: Path) -> None:
+    if not legacy.exists() or legacy.resolve() == path.resolve():
+        return
+    if not path.exists():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(legacy), str(path))
+        _normalize_state_file(path / "sessions.json")
+        return
+
+    legacy_file = legacy / "sessions.json"
+    if not legacy_file.exists():
+        return
+    target_file = path / "sessions.json"
+    old_state = _load_state_file(legacy_file)
+    state = _load_state_file(target_file) if target_file.exists() else _empty_state()
+    if old_state is None or state is None:
+        return
+    _normalize_state_names(old_state)
+    _normalize_state_names(state)
+
+    old_sessions = old_state.get("sessions")
+    sessions = state.setdefault("sessions", {})
+    if not isinstance(old_sessions, dict) or not isinstance(sessions, dict):
+        return
+    for session_id, old_session in old_sessions.items():
+        if not isinstance(old_session, dict):
+            continue
+        if session_id in sessions and isinstance(sessions[session_id], dict):
+            _merge_session_history(sessions[session_id], old_session)
+        elif session_id not in sessions:
+            sessions[session_id] = deepcopy(old_session)
+    if not state.get("latest_session_id") and old_state.get("latest_session_id") in sessions:
+        state["latest_session_id"] = old_state["latest_session_id"]
+    _write_state_file(target_file, state)
+    legacy_file.unlink()
+    try:
+        legacy.rmdir()
+    except OSError:
+        pass
+
+
+def _merge_session_history(session: dict[str, Any], old_session: dict[str, Any]) -> None:
+    groups = session.setdefault("groups", [])
+    old_groups = old_session.get("groups", [])
+    if not isinstance(groups, list) or not isinstance(old_groups, list):
+        return
+
+    old_latest_group_id = str(old_session.get("latest_group_id") or "")
+    migrated_latest_group_id = ""
+    for old_group in old_groups:
+        if not isinstance(old_group, dict):
+            continue
+        migrated = deepcopy(old_group)
+        group_id = str(migrated.get("id") or "legacy-group")
+        existing = next(
+            (group for group in groups if isinstance(group, dict) and group.get("id") == group_id),
+            None,
+        )
+        target_group_id = group_id
+        if existing == migrated:
+            pass
+        elif existing is not None:
+            suffix = 1
+            while True:
+                migrated["id"] = f"{group_id}-legacy-{suffix}"
+                target_group_id = migrated["id"]
+                collision = next(
+                    (
+                        group
+                        for group in groups
+                        if isinstance(group, dict) and group.get("id") == migrated["id"]
+                    ),
+                    None,
+                )
+                if collision == migrated:
+                    break
+                if collision is None:
+                    groups.append(migrated)
+                    break
+                suffix += 1
+        else:
+            groups.append(migrated)
+        if group_id == old_latest_group_id:
+            migrated_latest_group_id = target_group_id
+
+    if not session.get("latest_group_id") and migrated_latest_group_id:
+        session["latest_group_id"] = migrated_latest_group_id
+    if not session.get("latest_full_graph") and old_session.get("latest_full_graph"):
+        session["latest_full_graph"] = deepcopy(old_session["latest_full_graph"])
+
+
+def _load_state_file(path: Path) -> Optional[dict[str, Any]]:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _write_state_file(path: Path, state: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+    tmp.replace(path)
+
+
+def _normalize_state_names(state: dict[str, Any]) -> bool:
+    changed = False
+    sessions = state.get("sessions", {})
+    if not isinstance(sessions, dict):
+        return False
+    for session in sessions.values():
+        if not isinstance(session, dict):
+            continue
+        for group in session.get("groups", []):
+            if not isinstance(group, dict):
+                continue
+            for run in group.get("workflow_runs", []):
+                if not isinstance(run, dict):
+                    continue
+                if run.get("skill") == "codeflow-light":
+                    run["skill"] = "codeflow"
+                    changed = True
+                if run.get("skill_label") == "Codeflow Light":
+                    run["skill_label"] = "Codeflow"
+                    changed = True
+    return changed
+
+
+def _normalize_state_file(path: Path) -> None:
+    state = _load_state_file(path)
+    if state is not None and _normalize_state_names(state):
+        _write_state_file(path, state)
 
 
 def _read_state() -> dict[str, Any]:
     path = _state_file()
     if not path.exists():
         return _empty_state()
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
-        return _empty_state()
-    if not isinstance(data, dict):
+    data = _load_state_file(path)
+    if data is None:
         return _empty_state()
     data.setdefault("schema_version", 1)
     data.setdefault("latest_session_id", None)
     data.setdefault("sessions", {})
+    _normalize_state_names(data)
     return data
 
 
 def _write_state(state: dict[str, Any]) -> None:
-    path = _state_file()
-    tmp = path.with_suffix(".tmp")
-    tmp.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
-    tmp.replace(path)
+    _write_state_file(_state_file(), state)
 
 
 def _current_branch(project_root: str) -> str:
@@ -264,6 +398,18 @@ def append_workflow_event(
         run_steps = run.setdefault("steps", [])
         resolved_step_id = _clean_id(step_id) or _next_step_id(group, resolved_run_id, normalized_kind)
         existing_index = _find_step_index(run_steps, resolved_step_id)
+        step_agent = resolved_agent
+        step_agent_label = resolved_agent_label
+        if existing_index >= 0 and not step_agent:
+            existing_agent = str(run_steps[existing_index].get("agent") or "")
+            existing_label = str(run_steps[existing_index].get("agent_label") or "")
+            step_agent = existing_agent
+            step_agent_label = _agent_label(existing_agent, agent_label or existing_label)
+        elif existing_index >= 0 and not agent_label.strip():
+            existing_agent = str(run_steps[existing_index].get("agent") or "")
+            existing_label = str(run_steps[existing_index].get("agent_label") or "")
+            if step_agent == existing_agent and existing_label:
+                step_agent_label = existing_label
         event_order = (
             _int_value(run_steps[existing_index].get("event_order"), _next_event_order(group))
             if existing_index >= 0
@@ -278,8 +424,8 @@ def append_workflow_event(
             "summary": step_summary.strip() or _default_step_summary(normalized_kind, step_files),
             "detail": step_detail.strip(),
             "status": _clean_status(step_status),
-            "agent": resolved_agent,
-            "agent_label": resolved_agent_label,
+            "agent": step_agent,
+            "agent_label": step_agent_label,
             "files": step_files,
             "created_at": now.isoformat(timespec="seconds"),
             "sequence": step_sequence,
@@ -718,7 +864,7 @@ def _workflow_run_status(run: dict[str, Any], steps: list[dict[str, Any]]) -> st
         if terminal_statuses.get("push") in done and terminal_statuses.get("merge") in done:
             return "completed"
         return "in_progress"
-    if str(run.get("skill") or "") in {"general", "codeflow-light"}:
+    if str(run.get("skill") or "") in {"general", "codeflow"}:
         if terminal_statuses.get("verification") in done:
             return "completed"
         return "in_progress"

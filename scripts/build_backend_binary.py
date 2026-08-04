@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the Codeflow Light backend as a standalone executable."""
+"""Build the Codeflow backend as a standalone executable."""
 from __future__ import annotations
 
 import os
@@ -16,7 +16,7 @@ BACKEND = ROOT / "backend"
 OUTPUT = ROOT / "frontend" / "backend-bin"
 BUILD = ROOT / "build" / "pyinstaller-backend"
 BUILD_VENV = ROOT / "build" / "backend-binary-venv"
-NAME = "codeflow-light-backend"
+NAME = "codeflow-backend"
 
 
 def executable_name() -> str:
@@ -43,7 +43,7 @@ def python_version(python: Path | str) -> tuple[int, int, int]:
 
 
 def compatible_python() -> str:
-    requested = os.environ.get("CODEFLOW_LIGHT_BUILD_PYTHON", "").strip()
+    requested = os.environ.get("CODEFLOW_BUILD_PYTHON", "").strip()
     candidates = [
         requested,
         sys.executable,
@@ -68,7 +68,7 @@ def compatible_python() -> str:
             continue
     raise SystemExit(
         "Python 3.11 or newer is required to build the packaged backend. "
-        "Set CODEFLOW_LIGHT_BUILD_PYTHON to a compatible Python executable."
+        "Set CODEFLOW_BUILD_PYTHON to a compatible Python executable."
     )
 
 
@@ -93,7 +93,7 @@ def ensure_build_python() -> Path:
         print(f"Creating backend build venv: {BUILD_VENV}")
         run([compatible_python(), "-m", "venv", str(BUILD_VENV)], ROOT)
 
-    marker = BUILD_VENV / ".codeflow-light-backend-build-ready"
+    marker = BUILD_VENV / ".codeflow-backend-build-ready"
     if not marker.exists():
         run([str(python), "-m", "pip", "install", "--upgrade", "pip"], ROOT)
         run([str(python), "-m", "pip", "install", "pyinstaller"], ROOT)

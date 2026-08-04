@@ -43,10 +43,10 @@ import type {
   MarkdownWorkflowStepStatus,
 } from "@/types/changes";
 
-const LS_ROOT = "codeflow-light:projectRoot";
-const LS_RESPONSE = "codeflow-light:assistantResponse";
-const LS_NARRATIVE_OPEN = "codeflow-light:narrativeOpen";
-const LS_DOC_PANEL_WIDTH = "codeflow-light:docPanelWidth";
+const LS_ROOT = "codeflow:projectRoot";
+const LS_RESPONSE = "codeflow:assistantResponse";
+const LS_NARRATIVE_OPEN = "codeflow:narrativeOpen";
+const LS_DOC_PANEL_WIDTH = "codeflow:docPanelWidth";
 const DOC_PANEL_DEFAULT_WIDTH = 500;
 const DOC_PANEL_MIN_WIDTH = 340;
 const DOC_PANEL_MAX_WIDTH = 780;
@@ -279,7 +279,7 @@ export function ChangePage() {
       <header className="col-span-3 flex items-center justify-between border-b border-slate-800 bg-slate-900/80 px-4 py-2">
         <div className="flex items-center gap-2 text-[14px] font-semibold text-slate-100">
           <GitBranch className="h-4 w-4 text-cyan-300" />
-          Codeflow Light
+          Codeflow
           {sessionLabel ? (
             <span
               className="max-w-[320px] truncate rounded bg-slate-800 px-1.5 py-0.5 text-[10px] font-medium text-slate-300"

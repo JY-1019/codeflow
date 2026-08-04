@@ -1,6 +1,6 @@
 import type { Node, XYPosition } from "@xyflow/react";
 
-const PREFIX = "codeflow-light:nodePositions";
+const PREFIX = "codeflow:nodePositions";
 
 export type PositionMap = Record<string, XYPosition>;
 

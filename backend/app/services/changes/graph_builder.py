@@ -358,7 +358,7 @@ def _add_affected_nodes(
 def _add_import_edges(graph: ChangeGraph, diff: GitDiffResult, max_edges: int = 120) -> None:
     """Add file-level import edges for project-local imports.
 
-    Codeflow Light intentionally avoids a full language server. This resolver
+    Codeflow intentionally avoids a full language server. This resolver
     handles the import forms most common in the projects Codex/Claude edit:
     Python imports, TS/JS/React relative imports, and a few frontend aliases
     (`@/`, `~/`, `$lib/`).

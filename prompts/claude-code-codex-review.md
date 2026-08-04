@@ -1,9 +1,9 @@
 # Claude Code Implementation + Codex Review Prompt
 
-Claude Code에서 구현하고, Claude Code 안의 Codex review plugin이 리뷰하는 흐름을 Codeflow Light에 기록할 때 사용합니다.
+Claude Code에서 구현하고, Claude Code 안의 Codex review plugin이 리뷰하는 흐름을 Codeflow에 기록할 때 사용합니다.
 
 ```text
-codeflow-light로 이번 변경을 구현하고 Codeflow Light에 기록해줘.
+codeflow로 이번 변경을 구현하고 Codeflow에 기록해줘.
 
 요청:
 <여기에 구현 요청을 적습니다>

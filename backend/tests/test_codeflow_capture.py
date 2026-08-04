@@ -16,8 +16,8 @@ HOST_AGENT_ENV_VARS = (
 
 
 def _capture_module():
-    path = Path(__file__).resolve().parents[2] / "skill" / "scripts" / "codeflow_light_capture.py"
-    spec = importlib.util.spec_from_file_location("codeflow_light_capture", path)
+    path = Path(__file__).resolve().parents[2] / "skill" / "scripts" / "codeflow_capture.py"
+    spec = importlib.util.spec_from_file_location("codeflow_capture", path)
     assert spec is not None
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
@@ -51,3 +51,12 @@ def test_detect_host_agent_prefers_codex_when_claude_env_is_inherited(monkeypatc
     monkeypatch.setenv("CODEX_SESSION_ID", "codex-session")
 
     assert capture.detect_host_agent() == "codex"
+
+
+def test_shared_codeflow_session_id_overrides_each_host_session(monkeypatch):
+    capture = _capture_module()
+    monkeypatch.setenv("CODEFLOW_SESSION_ID", "shared-handoff")
+    monkeypatch.setenv("CODEX_THREAD_ID", "codex-thread")
+    monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", "claude-thread")
+
+    assert capture.default_capture_session_id("", {}) == "shared-handoff"

@@ -22,7 +22,7 @@ def build_markdown_workflow_runs(
 ) -> list[dict[str, Any]]:
     """Infer Markdown skill workflow runs from captured prompt/response text.
 
-    Codeflow Light stays local and deterministic: skills can keep sending just
+    Codeflow stays local and deterministic: skills can keep sending just
     prompt/response/diff, and this layer turns recognizable Markdown Branch
     Push/Commit captures into a structured flow. Future capture payloads can
     also include richer wording without changing the API contract.

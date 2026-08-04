@@ -19,7 +19,7 @@ DEFAULT_CAPTURE_TIMEOUT = 30.0
 
 
 def repo_root() -> Path:
-    configured = os.environ.get("CODEFLOW_LIGHT_APP_ROOT", "").strip()
+    configured = os.environ.get("CODEFLOW_APP_ROOT", "").strip()
     if configured:
         return Path(configured).expanduser().resolve()
 
@@ -34,17 +34,17 @@ def repo_root() -> Path:
         return legacy
 
     raise RuntimeError(
-        "Could not find Codeflow Light app root. Set CODEFLOW_LIGHT_APP_ROOT to the repository path."
+        "Could not find Codeflow app root. Set CODEFLOW_APP_ROOT to the repository path."
     )
 
 
 def codeflow_executable() -> Path:
-    configured = os.environ.get("CODEFLOW_LIGHT_EXECUTABLE", "").strip()
+    configured = os.environ.get("CODEFLOW_EXECUTABLE", "").strip()
     if configured:
         path = Path(configured).expanduser()
         if path.exists():
             return path.resolve()
-        raise RuntimeError(f"CODEFLOW_LIGHT_EXECUTABLE does not exist: {path}")
+        raise RuntimeError(f"CODEFLOW_EXECUTABLE does not exist: {path}")
 
     script_path = Path(__file__).resolve()
     candidates = [
@@ -60,7 +60,7 @@ def codeflow_executable() -> Path:
         return Path(path).resolve()
 
     raise RuntimeError(
-        "Could not find the Codeflow executable. Set CODEFLOW_LIGHT_EXECUTABLE "
+        "Could not find the Codeflow executable. Set CODEFLOW_EXECUTABLE "
         "or use the bundled skill/bin/codeflow file."
     )
 
@@ -112,7 +112,7 @@ def default_capture_session_id(raw_session_id: str, stdin_payload: dict[str, Any
         return explicit
 
     for env_name in (
-        "CODEFLOW_LIGHT_SESSION_ID",
+        "CODEFLOW_SESSION_ID",
         "CODEX_THREAD_ID",
         "CODEX_SESSION_ID",
         "CLAUDECODE_SESSION_ID",
@@ -126,15 +126,15 @@ def default_capture_session_id(raw_session_id: str, stdin_payload: dict[str, Any
 
 
 def launch_desktop(project_root: str, session_id: str, timeout: float = DEFAULT_CAPTURE_TIMEOUT) -> None:
-    log_path = Path(tempfile.gettempdir()) / "codeflow-light.log"
+    log_path = Path(tempfile.gettempdir()) / "codeflow.log"
     executable = codeflow_executable()
     env = {
         **os.environ,
-        "CODEFLOW_LIGHT_APP_ROOT": str(repo_root()),
-        "CODEFLOW_LIGHT_PROJECT_ROOT": project_root,
+        "CODEFLOW_APP_ROOT": str(repo_root()),
+        "CODEFLOW_PROJECT_ROOT": project_root,
     }
     if session_id:
-        env["CODEFLOW_LIGHT_SESSION_ID"] = session_id
+        env["CODEFLOW_SESSION_ID"] = session_id
     cmd = [str(executable), "--project-root", project_root, "--no-build"]
     if session_id:
         cmd.extend(["--session-id", session_id])
@@ -171,11 +171,11 @@ def wait_for_api(timeout: float = 30.0) -> None:
         except Exception as exc:
             last_error = str(exc)
         time.sleep(0.4)
-    raise RuntimeError(f"Codeflow Light API did not become ready: {last_error}")
+    raise RuntimeError(f"Codeflow API did not become ready: {last_error}")
 
 
 def capture_timeout() -> float:
-    raw = os.environ.get("CODEFLOW_LIGHT_CAPTURE_TIMEOUT", "").strip()
+    raw = os.environ.get("CODEFLOW_CAPTURE_TIMEOUT", "").strip()
     if not raw:
         return DEFAULT_CAPTURE_TIMEOUT
     try:
@@ -186,7 +186,7 @@ def capture_timeout() -> float:
 
 
 def skip_capture(reason: str) -> int:
-    print(f"Codeflow Light capture skipped: {reason}", file=sys.stderr)
+    print(f"Codeflow capture skipped: {reason}", file=sys.stderr)
     return 0
 
 
@@ -244,9 +244,9 @@ def latest_group(result: dict[str, Any]) -> dict[str, Any]:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Capture a Codex/Claude turn into Codeflow Light.")
+    parser = argparse.ArgumentParser(description="Capture a Codex/Claude turn into Codeflow.")
     parser.add_argument("--project-root", default="")
-    parser.add_argument("--session-id", default=os.environ.get("CODEFLOW_LIGHT_SESSION_ID", ""))
+    parser.add_argument("--session-id", default=os.environ.get("CODEFLOW_SESSION_ID", ""))
     parser.add_argument("--source", default="branch", choices=["working", "staged", "range", "branch"])
     parser.add_argument("--base-ref", default="")
     parser.add_argument("--head-ref", default="HEAD")
@@ -254,7 +254,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--assistant-response", default="")
     parser.add_argument("--prompt-file", default="")
     parser.add_argument("--response-file", default="")
-    parser.add_argument("--workflow-id", default=os.environ.get("CODEFLOW_LIGHT_WORKFLOW_ID", ""))
+    parser.add_argument("--workflow-id", default=os.environ.get("CODEFLOW_WORKFLOW_ID", ""))
     parser.add_argument("--run-id", default="")
     parser.add_argument("--skill", default="")
     parser.add_argument("--skill-label", default="")
@@ -352,7 +352,7 @@ def main() -> int:
         runs = latest.get("workflow_runs", [])
         steps = sum(len(run.get("steps", [])) for run in runs if isinstance(run, dict))
         print(
-            "Codeflow Light event captured "
+            "Codeflow event captured "
             f"session={result.get('session_id')} group={latest.get('name')} "
             f"kind={event_kind} workflow={event_payload.get('workflow_id') or latest.get('workflow_id')} "
             f"steps={steps}"
@@ -366,7 +366,7 @@ def main() -> int:
     latest = latest_group(result)
     graph = latest.get("graph", {})
     print(
-        "Codeflow Light captured "
+        "Codeflow captured "
         f"session={result.get('session_id')} group={latest.get('name')} "
         f"nodes={len(graph.get('nodes', []))} edges={len(graph.get('edges', []))}"
     )

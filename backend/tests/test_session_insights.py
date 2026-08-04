@@ -63,7 +63,7 @@ def test_enrich_session_response_filters_noisy_codex_review_output():
                 "assistant_response": (
                     "[output truncated]\n"
                     "sed -n '1,360p' frontend/src/flow/utils/positions.ts\" "
-                    "in /Users/a86466/workspace/codeflow-light\n"
+                    "in /Users/a86466/workspace/codeflow\n"
                     " succeeded in 0ms:\n"
                     "import type { Node } from '@xyflow/react';\n"
                     "const noisy = true;\n"

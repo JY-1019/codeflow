@@ -100,7 +100,7 @@ def clean_captured_text(text: str, max_chars: int = MAX_CAPTURE_TEXT_CHARS) -> s
     if result:
         return result
     if omitted_noise:
-        return "_Codeflow Light가 Codex 내부 경고와 긴 도구 출력을 생략했습니다._"
+        return "_Codeflow가 Codex 내부 경고와 긴 도구 출력을 생략했습니다._"
     return ""
 
 
@@ -160,4 +160,4 @@ def _trim_blank_edges(text: str) -> str:
 
 
 def _truncation_notice() -> str:
-    return "\n\n_Codeflow Light가 긴 Codex 리뷰 출력의 나머지를 생략했습니다._"
+    return "\n\n_Codeflow가 긴 Codex 리뷰 출력의 나머지를 생략했습니다._"

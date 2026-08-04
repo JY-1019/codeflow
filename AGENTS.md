@@ -1,4 +1,4 @@
-# Codeflow Light Codex Instructions
+# Codeflow Codex Instructions
 
 These instructions refine the global review-first workflow for this repository.
 

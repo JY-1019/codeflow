@@ -1,9 +1,9 @@
-# Codeflow Light Review Loop Prompt
+# Codeflow Review Loop Prompt
 
-commit/push 없이 현재 작업의 구현, 리뷰, 리뷰 반영, 검증 단계만 Codeflow Light에 기록하고 싶을 때 사용합니다.
+commit/push 없이 현재 작업의 구현, 리뷰, 리뷰 반영, 검증 단계만 Codeflow에 기록하고 싶을 때 사용합니다.
 
 ```text
-codeflow-light로 이번 구현과 리뷰 루틴을 Codeflow Light에 기록해줘.
+codeflow로 이번 구현과 리뷰 루틴을 Codeflow에 기록해줘.
 
 요청:
 <여기에 구현 요청을 적습니다>

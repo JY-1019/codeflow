@@ -211,7 +211,7 @@ def _implementation_lines_for_file(file_path: str, added: list[str], removed: li
     joined = "\n".join([*added, *removed])
     lines: list[str] = []
 
-    if re.search(r"codexThreadName|CODEFLOW_LIGHT_SESSION_TITLE|sessionTitle", joined):
+    if re.search(r"codexThreadName|CODEFLOW_SESSION_TITLE|sessionTitle", joined):
         lines.append("Codex 세션 id로 채팅 제목을 찾아 Electron 창 제목과 renderer query에 전달합니다.")
     elif re.search(r"WINDOW_SESSION_TITLE|session_title", joined):
         lines.append("Electron이 넘긴 채팅 제목을 화면 헤더 배지에 표시하고 hash는 fallback으로만 씁니다.")

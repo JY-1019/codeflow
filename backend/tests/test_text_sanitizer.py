@@ -21,7 +21,7 @@ def test_clean_captured_text_collapses_truncated_tool_output_until_review_bounda
     text = (
         "[output truncated]\n"
         "sed -n '1,360p' frontend/src/flow/utils/positions.ts\" "
-        "in /Users/a86466/workspace/codeflow-light\n"
+        "in /Users/a86466/workspace/codeflow\n"
         " succeeded in 0ms:\n"
         "import type { Node } from '@xyflow/react';\n"
         "export function noisy() {}\n"
@@ -44,6 +44,6 @@ def test_clean_captured_text_caps_long_text():
 
 
 def test_clean_captured_text_preserves_normal_path_sentences():
-    text = 'I changed "positions.ts" in /Users/a86466/workspace/codeflow-light.'
+    text = 'I changed "positions.ts" in /Users/a86466/workspace/codeflow.'
 
     assert clean_captured_text(text) == text

@@ -1,6 +1,6 @@
 """Read local Codex token usage from ~/.codex session logs.
 
-Codeflow Light never calls a Codex/OpenAI API for this. The desktop app only
+Codeflow never calls a Codex/OpenAI API for this. The desktop app only
 summarizes token_count events that Codex Desktop already wrote locally.
 """
 from __future__ import annotations

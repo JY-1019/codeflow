@@ -6,5 +6,5 @@ import sys
 from pathlib import Path
 
 
-script = Path(__file__).resolve().parents[1] / "skill" / "scripts" / "codeflow_light_capture.py"
+script = Path(__file__).resolve().parents[1] / "skill" / "scripts" / "codeflow_capture.py"
 os.execv(sys.executable, [sys.executable, str(script), *sys.argv[1:]])

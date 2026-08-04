@@ -319,7 +319,7 @@ def _workflow_skill_label(skill: str, label: str) -> str:
         "markdown-branch-push": "Markdown 브랜치 푸시",
         "markdown-branch-commit": "Markdown 브랜치 커밋",
         "captured-turn": "캡처된 턴",
-        "codeflow-light": "Codeflow 작업 기록",
+        "codeflow": "Codeflow 작업 기록",
         "general": "일반 작업 기록",
         "Markdown Branch Push": "Markdown 브랜치 푸시",
         "Markdown Branch Commit": "Markdown 브랜치 커밋",
