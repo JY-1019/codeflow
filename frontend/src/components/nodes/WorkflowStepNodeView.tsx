@@ -65,7 +65,7 @@ export const WorkflowStepNodeView = memo(({ data, selected }: NodeProps) => {
           {agentLabel ? (
             <span
               className="inline-flex shrink-0 items-center gap-1 rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-300"
-              title={`수행 주체: ${agentLabel}`}
+              title={`Agent: ${agentLabel}`}
             >
               <Bot className="h-3 w-3" />
               <span className="max-w-[84px] truncate">{agentLabel}</span>
@@ -78,7 +78,7 @@ export const WorkflowStepNodeView = memo(({ data, selected }: NodeProps) => {
           {step.label}
         </div>
         <div className="line-clamp-3 min-h-[48px] text-[12px] leading-snug text-slate-200">
-          {step.summary || "이 단계의 작업 내용이 아직 기록되지 않았습니다."}
+          {step.summary || "No work has been recorded for this step yet."}
         </div>
         {step.branchName || step.markdownPath ? (
           <div className="mt-2 flex min-w-0 gap-1">
@@ -164,16 +164,16 @@ function phaseConfig(kind: string): {
 }
 
 function stepKindLabel(kind: string): string {
-  if (kind === "preflight") return "사전 확인";
+  if (kind === "preflight") return "Preflight";
   if (kind === "markdown") return "Markdown";
-  if (kind === "branch") return "브랜치";
-  if (kind === "implementation") return "구현";
-  if (kind === "review") return "리뷰";
-  if (kind === "review_fix") return "리뷰 반영";
-  if (kind === "verification") return "검증";
-  if (kind === "commit") return "커밋";
-  if (kind === "push") return "푸시";
-  if (kind === "merge") return "병합";
+  if (kind === "branch") return "Branch";
+  if (kind === "implementation") return "Implementation";
+  if (kind === "review") return "Review";
+  if (kind === "review_fix") return "Review fix";
+  if (kind === "verification") return "Verification";
+  if (kind === "commit") return "Commit";
+  if (kind === "push") return "Push";
+  if (kind === "merge") return "Merge";
   return kind;
 }
 
@@ -207,11 +207,11 @@ function statusIcon(status: MarkdownWorkflowStepStatus): LucideIcon {
 }
 
 function statusLabel(status: MarkdownWorkflowStepStatus): string {
-  if (status === "completed") return "완료";
-  if (status === "skipped") return "건너뜀";
-  if (status === "blocked") return "차단";
-  if (status === "pending") return "대기";
-  return "미확인";
+  if (status === "completed") return "Completed";
+  if (status === "skipped") return "Skipped";
+  if (status === "blocked") return "Blocked";
+  if (status === "pending") return "Pending";
+  return "Unknown";
 }
 
 function statusClass(status: MarkdownWorkflowStepStatus): string {

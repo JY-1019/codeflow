@@ -28,11 +28,11 @@ WORKFLOW_STEP_ORDER = {
     "merge": 100,
 }
 WORKFLOW_SKILL_LABELS = {
-    "markdown-branch-push": "Markdown 브랜치 푸시",
-    "markdown-branch-commit": "Markdown 브랜치 커밋",
-    "captured-turn": "캡처된 턴",
-    "codeflow": "Codeflow 작업 기록",
-    "general": "일반 작업 기록",
+    "markdown-branch-push": "Markdown Branch Push",
+    "markdown-branch-commit": "Markdown Branch Commit",
+    "captured-turn": "Captured turn",
+    "codeflow": "Codeflow capture",
+    "general": "General capture",
 }
 
 # Which coding tool/agent actually performed a step. The host tool (Claude Code
@@ -751,43 +751,46 @@ def _agent_label(agent: str, label: str) -> str:
 
 def _default_step_label(kind: str) -> str:
     return {
-        "preflight": "사전 확인",
-        "markdown": "Markdown 명령 해석",
-        "branch": "작업 브랜치 준비",
-        "implementation": "구현 작업",
-        "review": "리뷰 실행",
-        "review_fix": "리뷰 반영",
-        "verification": "검증",
-        "commit": "커밋",
-        "push": "브랜치 푸시",
-        "merge": "main 병합/푸시",
+        "preflight": "Preflight",
+        "markdown": "Parse Markdown command",
+        "branch": "Prepare work branch",
+        "implementation": "Implementation",
+        "review": "Run review",
+        "review_fix": "Apply review fixes",
+        "verification": "Verification",
+        "commit": "Commit",
+        "push": "Push branch",
+        "merge": "Merge/push main",
     }.get(kind, kind)
 
 
 def _default_step_summary(kind: str, files: list[str]) -> str:
     if kind in {"implementation", "review_fix"} and files:
-        return f"{len(files)}개 파일 diff를 기록했습니다."
+        count = len(files)
+        return f"Recorded a diff for {count} file{'s' if count != 1 else ''}."
     return {
-        "preflight": "저장소와 리뷰 실행 조건을 확인했습니다.",
-        "markdown": "Markdown 요청을 구현 단위로 기록했습니다.",
-        "branch": "Markdown 단위 작업 브랜치를 준비했습니다.",
-        "implementation": "구현 단계가 기록되었습니다.",
-        "review": "리뷰 결과를 기록했습니다.",
-        "review_fix": "리뷰 반영 단계가 기록되었습니다.",
-        "verification": "검증 결과를 기록했습니다.",
-        "commit": "커밋 결과를 기록했습니다.",
-        "push": "브랜치 푸시 결과를 기록했습니다.",
-        "merge": "main 병합/푸시 결과를 기록했습니다.",
-    }.get(kind, "단계 이벤트를 기록했습니다.")
+        "preflight": "Checked the repository and review prerequisites.",
+        "markdown": "Recorded the Markdown request as an implementation unit.",
+        "branch": "Prepared a work branch for the Markdown unit.",
+        "implementation": "Recorded the implementation step.",
+        "review": "Recorded the review result.",
+        "review_fix": "Recorded the review-fix step.",
+        "verification": "Recorded the verification result.",
+        "commit": "Recorded the commit result.",
+        "push": "Recorded the branch push result.",
+        "merge": "Recorded the main merge/push result.",
+    }.get(kind, "Recorded a workflow step event.")
 
 
 def _workflow_skill_label(skill: str, label: str) -> str:
     cleaned = label.strip() or skill.strip()
     known = {
         **WORKFLOW_SKILL_LABELS,
-        "Markdown Branch Push": "Markdown 브랜치 푸시",
-        "Markdown Branch Commit": "Markdown 브랜치 커밋",
-        "Captured turn": "캡처된 턴",
+        "Markdown 브랜치 푸시": "Markdown Branch Push",
+        "Markdown 브랜치 커밋": "Markdown Branch Commit",
+        "캡처된 턴": "Captured turn",
+        "Codeflow 작업 기록": "Codeflow capture",
+        "일반 작업 기록": "General capture",
     }
     return known.get(cleaned, known.get(skill.strip(), cleaned))
 
@@ -795,12 +798,13 @@ def _workflow_skill_label(skill: str, label: str) -> str:
 def _localized_command_label(label: str) -> str:
     cleaned = label.strip()
     replacements = {
-        "Markdown Branch Push": "Markdown 브랜치 푸시",
-        "Markdown Branch Commit": "Markdown 브랜치 커밋",
-        "Captured turn": "캡처된 턴",
+        "Markdown 브랜치 푸시": "Markdown Branch Push",
+        "Markdown 브랜치 커밋": "Markdown Branch Commit",
+        "캡처된 턴": "Captured turn",
     }
     for source, target in replacements.items():
-        cleaned = cleaned.replace(source, target)
+        if cleaned == source or cleaned.startswith(f"{source} · "):
+            return target + cleaned[len(source):]
     return cleaned
 
 

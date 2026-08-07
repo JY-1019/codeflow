@@ -26,7 +26,7 @@ export interface GroupNodeData {
 
 export const GroupNodeView = memo(({ data, selected }: NodeProps) => {
   const group = data as unknown as GroupNodeData;
-  const prompt = group.prompt.trim() || "사용자 질의가 기록되지 않았습니다.";
+  const prompt = group.prompt.trim() || "No user prompt was recorded.";
   const phase = phaseConfig(group.phase);
   const PhaseIcon = phase.icon;
   const mainSummary =
@@ -88,7 +88,7 @@ export const GroupNodeView = memo(({ data, selected }: NodeProps) => {
         </div>
       ) : (
         <div className="min-h-8 border-t border-slate-800 px-3 py-2 text-[10px] text-slate-500">
-          세션 요약 대기
+          Waiting for session summary
         </div>
       )}
       <Handle
@@ -114,7 +114,7 @@ function phaseConfig(phase: ChangeGroupPhase | undefined): {
 } {
   if (phase === "review") {
     return {
-      label: "리뷰",
+      label: "Review",
       icon: SearchCheck,
       border: "border-amber-500/70",
       selectedBorder: "border-amber-300",
@@ -126,7 +126,7 @@ function phaseConfig(phase: ChangeGroupPhase | undefined): {
   }
   if (phase === "review_fix") {
     return {
-      label: "리뷰 반영",
+      label: "Review fix",
       icon: RotateCcw,
       border: "border-violet-500/70",
       selectedBorder: "border-violet-300",
@@ -138,7 +138,7 @@ function phaseConfig(phase: ChangeGroupPhase | undefined): {
   }
   if (phase === "verification") {
     return {
-      label: "검증",
+      label: "Verification",
       icon: FlaskConical,
       border: "border-emerald-500/70",
       selectedBorder: "border-emerald-300",
@@ -150,7 +150,7 @@ function phaseConfig(phase: ChangeGroupPhase | undefined): {
   }
   if (phase === "planning") {
     return {
-      label: "정리",
+      label: "Planning",
       icon: ClipboardList,
       border: "border-sky-500/70",
       selectedBorder: "border-sky-300",
@@ -161,7 +161,7 @@ function phaseConfig(phase: ChangeGroupPhase | undefined): {
     };
   }
   return {
-    label: "구현",
+    label: "Implementation",
     icon: Hammer,
     border: "border-cyan-500/70",
     selectedBorder: "border-cyan-300",

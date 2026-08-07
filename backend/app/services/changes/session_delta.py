@@ -134,20 +134,20 @@ def _lift_edges_to_changed_files(
 
 def _file_edge_summary(source_node: ChangeNode, target_node: ChangeNode, edge: ChangeEdge) -> str:
     if edge.kind == "calls":
-        return f"`{source_node.file}` 의 `{source_node.label}` 가 `{target_node.file}` 의 `{target_node.label}` 를 호출합니다."
+        return f"`{source_node.label}` in `{source_node.file}` calls `{target_node.label}` in `{target_node.file}`."
     if edge.kind == "referenced_by":
-        return f"`{source_node.file}` 가 `{target_node.file}` 의 변경 심볼 `{target_node.label}` 를 참조합니다."
-    return f"`{source_node.file}` 와 `{target_node.file}` 사이의 {edge.kind} 관계입니다."
+        return f"`{source_node.file}` references changed symbol `{target_node.label}` in `{target_node.file}`."
+    return f"{edge.kind} relationship between `{source_node.file}` and `{target_node.file}`."
 
 
 def _file_edge_body(source_node: ChangeNode, target_node: ChangeNode, edge: ChangeEdge) -> str:
     return "\n".join(
         [
-            f"- **관계**: {edge.kind}",
-            f"- **출발 파일**: `{source_node.file}`",
-            f"- **출발 코드**: `{source_node.label}`",
-            f"- **도착 파일**: `{target_node.file}`",
-            f"- **도착 코드**: `{target_node.label}`",
+            f"- **Relationship**: {edge.kind}",
+            f"- **Source file**: `{source_node.file}`",
+            f"- **Source symbol**: `{source_node.label}`",
+            f"- **Target file**: `{target_node.file}`",
+            f"- **Target symbol**: `{target_node.label}`",
         ]
     )
 
@@ -209,8 +209,8 @@ def _reverted_file_nodes(
                 language=str(previous.get("language") or ""),
                 symbol_kind="file",
                 status="modified",
-                summary="기존 세션 변경을 되돌림",
-                body="이 파일은 이전 capture에 있던 branch diff에서 사라져, base 상태로 되돌아간 단계로 기록됩니다.",
+                summary="Reverted a previous session change",
+                body="This file disappeared from the branch diff after a previous capture, so the step records its return to the base state.",
                 snippet=snippet,
                 added_lines=added_lines,
                 removed_lines=removed_lines,

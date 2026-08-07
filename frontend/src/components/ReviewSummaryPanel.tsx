@@ -37,7 +37,7 @@ export function ReviewSummaryPanel({
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-slate-900/70">
       <div className="flex shrink-0 items-center gap-2 border-b border-slate-800 px-3 py-2 text-[12px] font-semibold uppercase tracking-wider text-slate-400">
         <GitCompareArrows className="h-3.5 w-3.5 text-cyan-300" />
-        Git Diff 요약
+        Git diff summary
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto p-3 text-[13px]">
         {!summary ? (
@@ -46,7 +46,7 @@ export function ReviewSummaryPanel({
           <div className="space-y-4">
             <div className="rounded-md border border-slate-700 bg-slate-950/50 p-3">
               <div className="flex items-center justify-between gap-2 text-[10px] uppercase tracking-wider text-slate-500">
-                <span>전반적 설명</span>
+                <span>Overview</span>
                 {refreshedAt ? (
                   <span className="normal-case tracking-normal text-slate-500">{refreshedAt}</span>
                 ) : null}
@@ -57,16 +57,16 @@ export function ReviewSummaryPanel({
             </div>
 
             <div className="grid grid-cols-2 gap-2">
-              <StatCard icon={FileText} label="파일" value={summary.fileCount} />
-              <StatCard icon={Link2} label="관계" value={summary.edgeCount} />
-              <StatCard icon={Sigma} label="추가" value={`+${summary.added}`} tone="emerald" />
-              <StatCard icon={Sigma} label="삭제" value={`-${summary.removed}`} tone="rose" />
+              <StatCard icon={FileText} label="Files" value={summary.fileCount} />
+              <StatCard icon={Link2} label="Relations" value={summary.edgeCount} />
+              <StatCard icon={Sigma} label="Added" value={`+${summary.added}`} tone="emerald" />
+              <StatCard icon={Sigma} label="Removed" value={`-${summary.removed}`} tone="rose" />
             </div>
 
             <section className="rounded-md border border-slate-800 bg-slate-950/20">
               <SectionToggle
                 open={filesOpen}
-                title="변경 파일"
+                title="Changed files"
                 count={summary.files.length}
                 onToggle={() => setFilesOpen((value) => !value)}
               />
@@ -106,7 +106,7 @@ export function ReviewSummaryPanel({
             <section className="rounded-md border border-slate-800 bg-slate-950/20">
               <SectionToggle
                 open={edgesOpen}
-                title="연결 항목"
+                title="Connections"
                 count={summary.edges.length}
                 onToggle={() => setEdgesOpen((value) => !value)}
               />
@@ -114,7 +114,7 @@ export function ReviewSummaryPanel({
                 <div className="border-t border-slate-800 p-2">
                   {summary.edges.length === 0 ? (
                     <div className="rounded-md border border-slate-800 bg-slate-950/35 px-3 py-3 text-[12px] text-slate-500">
-                      현재 변경 파일 사이에서 감지된 import 관계가 없습니다.
+                      No import relationships were detected between the changed files.
                     </div>
                   ) : (
                     <div className="space-y-2">
@@ -144,7 +144,7 @@ export function ReviewSummaryPanel({
 
             {summary.warnings.length > 0 ? (
               <section className="rounded-md border border-amber-800/70 bg-amber-950/30 p-3 text-[12px] text-amber-200">
-                <div className="mb-1 font-semibold">경고</div>
+                <div className="mb-1 font-semibold">Warnings</div>
                 <ul className="list-disc pl-4">
                   {summary.warnings.map((warning, index) => (
                     <li key={index}>{warning}</li>
@@ -190,7 +190,7 @@ function EmptySummary({ loading }: { loading: boolean }) {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-2 px-4 text-center text-[12px] text-slate-500">
       <RefreshCw className={`h-5 w-5 ${loading ? "animate-spin text-cyan-300" : "text-slate-600"}`} />
-      <div>{loading ? "diff를 요약하는 중..." : "Diff 갱신을 누르면 branch diff 요약이 여기에 표시됩니다."}</div>
+      <div>{loading ? "Summarizing diff..." : "Select Refresh diff to display the branch diff summary here."}</div>
     </div>
   );
 }
@@ -243,7 +243,7 @@ function summarizeGraph(graph: ChangeGraphResponse) {
 
 function buildOverview(files: ChangeNode[], edges: ChangeEdge[]): string {
   if (files.length === 0) {
-    return "현재 branch diff에서 직접 수정된 파일이 없습니다.";
+    return "No files were changed directly in the current branch diff.";
   }
 
   const added = sum(files.map((node) => node.added_lines));
@@ -255,12 +255,12 @@ function buildOverview(files: ChangeNode[], edges: ChangeEdge[]): string {
     .join(", ");
   const relationText =
     edges.length > 0
-      ? `감지된 연결은 ${edges.length}개이며, 아래 연결 항목에서 어떤 파일이 어떤 파일을 import하는지 확인할 수 있습니다.`
-      : "변경 파일 사이에서 직접 감지된 import 연결은 없습니다.";
+      ? `${edges.length} connection${edges.length === 1 ? " was" : "s were"} detected. See Connections below for import details.`
+      : "No direct import connections were detected between the changed files.";
 
   return [
-    `${areas} 중심으로 ${files.length}개 파일을 수정했습니다.`,
-    `전체 라인 변화는 +${added}/-${removed}이고, 변화가 큰 파일은 ${mainFiles}입니다.`,
+    `Changed ${files.length} file${files.length === 1 ? "" : "s"}, mainly in ${areas}.`,
+    `Total line changes are +${added}/-${removed}; the largest change${files.length === 1 ? " is" : "s are"} in ${mainFiles}.`,
     relationText,
   ].join("\n");
 }
@@ -275,20 +275,20 @@ function describeAreas(files: ChangeNode[]): string {
   return Array.from(areaCounts.entries())
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
     .slice(0, 3)
-    .map(([label, count]) => `${label} ${count}개`)
+    .map(([label, count]) => `${label} (${count})`)
     .join(", ");
 }
 
 function areaLabel(file: string): string {
-  if (file.startsWith("frontend/src/components/")) return "프론트 컴포넌트";
-  if (file.startsWith("frontend/src/pages/")) return "프론트 페이지";
-  if (file.startsWith("frontend/src/")) return "프론트 로직";
-  if (file.startsWith("backend/app/services/")) return "백엔드 서비스";
-  if (file.startsWith("backend/app/routers/")) return "백엔드 API";
-  if (file.startsWith("backend/tests/")) return "백엔드 테스트";
-  if (file.startsWith("skill/")) return "스킬";
-  if (file.endsWith(".md")) return "문서";
-  return file.split("/")[0] || "기타";
+  if (file.startsWith("frontend/src/components/")) return "frontend components";
+  if (file.startsWith("frontend/src/pages/")) return "frontend pages";
+  if (file.startsWith("frontend/src/")) return "frontend logic";
+  if (file.startsWith("backend/app/services/")) return "backend services";
+  if (file.startsWith("backend/app/routers/")) return "backend API";
+  if (file.startsWith("backend/tests/")) return "backend tests";
+  if (file.startsWith("skill/")) return "skills";
+  if (file.endsWith(".md")) return "documentation";
+  return file.split("/")[0] || "other files";
 }
 
 function compareByChangeWeight(a: ChangeNode, b: ChangeNode): number {
@@ -307,9 +307,9 @@ function sum(values: number[]): number {
 }
 
 function statusLabel(status: string): string {
-  if (status === "added") return "추가";
-  if (status === "modified") return "수정";
-  if (status === "deleted") return "삭제";
-  if (status === "renamed") return "이름 변경";
+  if (status === "added") return "Added";
+  if (status === "modified") return "Modified";
+  if (status === "deleted") return "Deleted";
+  if (status === "renamed") return "Renamed";
   return status;
 }

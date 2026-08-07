@@ -233,7 +233,7 @@ def test_session_delta_records_reverted_file_that_disappears_from_current_diff(t
     filter_graph_to_session_delta(graph, previous)
 
     assert [(node.file, node.summary) for node in graph.nodes] == [
-        ("settings.py", "기존 세션 변경을 되돌림")
+        ("settings.py", "Reverted a previous session change")
     ]
     assert "- alpha = 2" in graph.nodes[0].snippet
     assert "+ alpha = 1" in graph.nodes[0].snippet

@@ -44,7 +44,82 @@ def test_enrich_session_response_adds_phase_and_session_summary():
     assert "구현: `SessionFlow`가 구현/리뷰 단계를 보여줍니다." in group["summary"]["implementation"]
     assert enriched["summary"]["total_groups"] == 1
     assert enriched["summary"]["phase_counts"]["implementation"] == 1
-    assert any(item["label"] == "리뷰 루프" for item in enriched["summary"]["technical_considerations"])
+    assert any(item["label"] == "Review loop" for item in enriched["summary"]["technical_considerations"])
+
+
+def test_enrich_session_response_translates_legacy_generated_workflow_text():
+    response = {
+        "groups": [
+            {
+                "name": "Markdown 브랜치 커밋 · request.md",
+                "workflow_runs": [
+                    {
+                        "skill": "markdown-branch-commit",
+                        "skill_label": "Markdown 브랜치 커밋",
+                        "command_label": "Markdown 브랜치 커밋 · request.md",
+                        "steps": [
+                            {
+                                "kind": "implementation",
+                                "label": "구현 작업",
+                                "summary": "1개 파일 diff를 기록했습니다.",
+                                "agent": "codex",
+                                "agent_label": "Codex",
+                            }
+                        ],
+                    }
+                ],
+            }
+        ]
+    }
+
+    group = enrich_session_response(response)["groups"][0]
+    run = group["workflow_runs"][0]
+    step = run["steps"][0]
+
+    assert group["name"] == "Markdown Branch Commit · request.md"
+    assert run["skill_label"] == "Markdown Branch Commit"
+    assert run["command_label"] == "Markdown Branch Commit · request.md"
+    assert step["label"] == "Implementation"
+    assert step["summary"] == "Recorded a diff for 1 file."
+    assert step["agent"] == "codex"
+    assert step["agent_label"] == "Codex"
+
+
+def test_enrich_session_response_preserves_custom_korean_labels():
+    response = {
+        "groups": [
+            {
+                "name": "회의: Markdown 브랜치 커밋 금지",
+                "workflow_runs": [
+                    {
+                        "skill": "general",
+                        "skill_label": "General capture",
+                        "command_label": "회의: Markdown 브랜치 커밋 금지",
+                        "steps": [
+                            {
+                                "kind": "review",
+                                "label": "검증",
+                                "summary": "커밋",
+                                "agent": "my-tool",
+                                "agent_label": "사내 도구",
+                            }
+                        ],
+                    }
+                ],
+            }
+        ]
+    }
+
+    group = enrich_session_response(response)["groups"][0]
+    run = group["workflow_runs"][0]
+    step = run["steps"][0]
+
+    assert group["name"] == "회의: Markdown 브랜치 커밋 금지"
+    assert run["command_label"] == "회의: Markdown 브랜치 커밋 금지"
+    assert step["label"] == "검증"
+    assert step["summary"] == "커밋"
+    assert step["agent"] == "my-tool"
+    assert step["agent_label"] == "사내 도구"
 
 
 def test_enrich_session_response_filters_noisy_codex_review_output():

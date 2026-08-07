@@ -40,10 +40,19 @@ def test_clean_captured_text_caps_long_text():
     cleaned = clean_captured_text(("리뷰 본문\n" * 2_000), max_chars=1_000)
 
     assert len(cleaned) <= 1_000
-    assert "나머지를 생략" in cleaned
+    assert "omitted the rest" in cleaned
 
 
 def test_clean_captured_text_preserves_normal_path_sentences():
     text = 'I changed "positions.ts" in /Users/a86466/workspace/codeflow.'
 
     assert clean_captured_text(text) == text
+
+
+def test_clean_captured_text_translates_legacy_generated_notices():
+    assert clean_captured_text(
+        "_Codeflow가 Codex 내부 경고와 긴 도구 출력을 생략했습니다._"
+    ) == "_Codeflow omitted Codex runtime warnings and long tool output._"
+    assert clean_captured_text(
+        "_Codeflow가 긴 Codex 리뷰 출력의 나머지를 생략했습니다._"
+    ) == "_Codeflow omitted the rest of the long Codex review output._"

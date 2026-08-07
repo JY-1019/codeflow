@@ -4,7 +4,7 @@ Goal: when the user opens the UI without pasting any LLM response, each node/edg
 should still carry a useful, non-empty summary + body built mechanically from
 the diff structure itself.
 
-The output is intentionally short and factual ("수정된 함수",
+The output is intentionally short and factual ("modified function",
 not "this beautifully refactored function ..."). When an LLM response is later
 attached via response_mapper.attach_response, those LLM paragraphs are *appended*
 on top of these defaults, not replacing them.
@@ -16,36 +16,36 @@ import re
 from .graph_builder import ChangeEdge, ChangeGraph, ChangeNode
 
 
-_STATUS_LABEL_KO: dict[str, str] = {
-    "added": "추가됨",
-    "modified": "수정됨",
-    "deleted": "삭제됨",
-    "renamed": "이름 변경",
-    "unchanged": "변경 없음",
+_STATUS_LABEL: dict[str, str] = {
+    "added": "added",
+    "modified": "modified",
+    "deleted": "deleted",
+    "renamed": "renamed",
+    "unchanged": "unchanged",
 }
 
-_KIND_LABEL_KO: dict[str, str] = {
-    "changed": "직접 변경",
-    "affected": "영향 받음",
-    "context": "참조 컨텍스트",
-    "file": "파일",
+_KIND_LABEL: dict[str, str] = {
+    "changed": "direct change",
+    "affected": "affected",
+    "context": "reference context",
+    "file": "file",
 }
 
-_SYMBOL_LABEL_KO: dict[str, str] = {
-    "file": "파일",
-    "function": "함수",
-    "method": "메서드",
-    "class": "클래스",
-    "module": "모듈",
+_SYMBOL_LABEL: dict[str, str] = {
+    "file": "file",
+    "function": "function",
+    "method": "method",
+    "class": "class",
+    "module": "module",
 }
 
-_EDGE_KIND_KO: dict[str, str] = {
-    "contains": "포함",
-    "calls": "참조/호출",
-    "imports": "import",
-    "referenced_by": "사용처",
-    "modifies": "수정",
-    "renamed_from": "이름 변경",
+_EDGE_KIND_LABEL: dict[str, str] = {
+    "contains": "contains",
+    "calls": "calls/references",
+    "imports": "imports",
+    "referenced_by": "uses",
+    "modifies": "modifies",
+    "renamed_from": "renamed from",
 }
 
 
@@ -58,23 +58,23 @@ def fill_default_docs(graph: ChangeGraph) -> None:
 
 
 def _fill_node_default(node: ChangeNode) -> None:
-    status_ko = _STATUS_LABEL_KO.get(node.status, node.status)
-    symbol_ko = _SYMBOL_LABEL_KO.get(node.symbol_kind, node.symbol_kind or "심볼")
-    kind_ko = _KIND_LABEL_KO.get(node.kind, node.kind)
+    status_label = _STATUS_LABEL.get(node.status, node.status)
+    symbol_label = _SYMBOL_LABEL.get(node.symbol_kind, node.symbol_kind or "symbol")
+    kind_label = _KIND_LABEL.get(node.kind, node.kind)
 
     if not node.summary:
         if node.kind == "affected":
-            node.summary = f"변경된 심볼을 참조하는 외부 {symbol_ko}."
+            node.summary = f"External {symbol_label} that references a changed symbol."
         elif node.status == "added":
-            node.summary = f"새로 추가된 {symbol_ko}"
+            node.summary = f"Newly added {symbol_label}"
         elif node.status == "deleted":
-            node.summary = f"삭제된 {symbol_ko}"
+            node.summary = f"Deleted {symbol_label}"
         elif node.status == "renamed":
-            node.summary = f"이름이 변경된 {symbol_ko}"
+            node.summary = f"Renamed {symbol_label}"
         elif node.status == "modified":
-            node.summary = f"수정된 {symbol_ko}"
+            node.summary = f"Modified {symbol_label}"
         else:
-            node.summary = f"{kind_ko} · {symbol_ko}"
+            node.summary = f"{kind_label} · {symbol_label}"
 
     if node.body:
         return
@@ -84,11 +84,11 @@ def _fill_node_default(node: ChangeNode) -> None:
     if node.snippet:
         lines.extend(_plain_change_lines(node.file, node.snippet))
     else:
-        lines.extend(_fallback_change_lines(kind_ko, status_ko, symbol_ko))
+        lines.extend(_fallback_change_lines(kind_label, status_label, symbol_label))
 
     if node.kind == "affected":
         lines.append("")
-        lines.append("직접 수정된 코드는 아니고, 변경 파일과 연결된 사용처입니다.")
+        lines.append("This code was not changed directly; it is a usage site connected to a changed file.")
 
     node.body = "\n".join(lines).strip()
 
@@ -97,8 +97,8 @@ def _plain_change_lines(file_path: str, snippet: str) -> list[str]:
     hunks = _parse_snippet_hunks(snippet)
     if not hunks:
         return [
-            "diff 스니펫에서 파일 단위 구현 요약을 만들 단서를 찾지 못했습니다.",
-            "세션 요약에는 변경 파일과 단계 정보만 표시됩니다.",
+            "The diff snippet did not contain enough detail for a file-level implementation summary.",
+            "The session summary shows only changed files and step information.",
         ]
 
     all_removed = _flatten_hunk_lines(hunks, "removed")
@@ -110,17 +110,17 @@ def _plain_change_lines(file_path: str, snippet: str) -> list[str]:
     intent = _summarize_code_intent(all_added, all_removed)
     if intent:
         return [
-            "구현 내용을 대표하는 변경 신호를 파일 단위로 요약합니다.",
-            f"감지된 구현 신호: {intent}",
+            "File-level change signals summarize the implementation.",
+            f"Detected implementation signals: {intent}",
         ]
 
-    return ["설명 가능한 구현 단서를 찾지 못했습니다. 세션 흐름에서 변경 파일 범위를 확인하세요."]
+    return ["No explainable implementation signal was found. Check the changed-file scope in the session flow."]
 
 
-def _fallback_change_lines(kind_ko: str, status_ko: str, symbol_ko: str) -> list[str]:
+def _fallback_change_lines(kind_label: str, status_label: str, symbol_label: str) -> list[str]:
     return [
-        f"{kind_ko} 대상인 {symbol_ko}의 상태가 {status_ko}로 표시됩니다.",
-        "코드 스니펫이 있으면 파일 단위 구현 요약에 반영됩니다.",
+        f"The {kind_label} {symbol_label} is marked as {status_label}.",
+        "When available, the code snippet contributes to the file-level implementation summary.",
     ]
 
 
@@ -168,42 +168,42 @@ def _summarize_code_intent(added: list[str], removed: list[str]) -> str:
             signals.append(label)
 
     if re.search(r"\bawait\b|\bfetch[A-Za-z0-9_]*\s*\(", joined):
-        add_signal("비동기 데이터 로드")
+        add_signal("asynchronous data loading")
     if re.search(r"\bset[A-Z][A-Za-z0-9_]*\s*\(", joined):
-        add_signal("React 상태 갱신")
+        add_signal("React state updates")
     if re.search(r"\bif\s*\(|\?\s*[^:]+:", joined):
-        add_signal("조건 처리")
+        add_signal("conditional logic")
     if re.search(r"^\s*(import|export)\b", joined, re.MULTILINE):
-        add_signal("모듈 연결")
+        add_signal("module wiring")
     if re.search(r"\b(useEffect|useMemo|useCallback|useState)\s*\(", joined):
-        add_signal("React 훅 흐름")
+        add_signal("React hook flow")
     if re.search(r"<[A-Za-z][A-Za-z0-9.:-]*\b|className=", joined):
-        add_signal("화면 표시 조정")
+        add_signal("UI rendering changes")
     if re.search(r"\b(type|interface)\s+[A-Za-z_$][\w$]*", joined):
-        add_signal("타입 정의")
+        add_signal("type definitions")
     if re.search(r"\b(return|throw)\b", joined):
-        add_signal("반환/예외 흐름")
+        add_signal("return/error flow")
     if re.search(r"\b(?:const|let|var)\s+[A-Za-z_$][\w$]*\s*=|^\s*[A-Za-z_$][\w$.]*\s*=", joined, re.MULTILINE):
-        add_signal("값 계산/할당")
+        add_signal("value calculation/assignment")
     if re.search(r"\b[A-Za-z_$][\w$.]*\s*\(", joined):
-        add_signal("함수 호출")
+        add_signal("function calls")
 
     return ", ".join(signals[:3])
 
 
 _KNOWN_IMPLEMENTATIONS: dict[str, str] = {
-    "enrich_session_response": "저장된 대화 group에 구현/리뷰 단계와 세션 요약을 붙입니다.",
-    "enrich_group": "하나의 capture group에서 phase, 구현 요약, 리뷰 요약, 기술 고려사항을 계산합니다.",
-    "build_session_summary": "여러 group에서 최종 구현 범위와 리뷰 흐름을 합산합니다.",
-    "technical_considerations": "prompt, 응답, 변경 파일명을 바탕으로 기술 고려사항 카테고리를 추출합니다.",
-    "implementation_summary": "라인별 설명 대신 파일 단위 구현 요약을 만듭니다.",
-    "review_summary": "리뷰와 검증에 해당하는 문장을 세션 단계 요약으로 정리합니다.",
-    "extractDeclarations": "diff에 추가된 함수, 클래스, 타입 선언을 뽑아 노드 요약의 근거로 씁니다.",
-    "codexThreadName": "Codex session id로 session_index.jsonl을 역순 검색해 채팅 대화 제목을 찾습니다.",
-    "codexHome": "CODEX_HOME 값과 ~ 경로를 안전하게 해석해 Codex 로컬 데이터를 찾습니다.",
-    "formatTitleLabel": "창 제목과 헤더 배지에 넣기 좋도록 긴 대화 제목을 한 줄로 줄입니다.",
-    "_flatten_hunk_lines": "diff hunk에 흩어진 추가/삭제 라인을 하나의 목록으로 모아 분석 입력으로 만듭니다.",
-    "_summarize_code_intent": "추가/삭제 코드에서 await, React setter, import 같은 신호를 찾아 파일 단위 요약으로 바꿉니다.",
+    "enrich_session_response": "Adds implementation/review steps and a session summary to stored conversation groups.",
+    "enrich_group": "Computes the phase, implementation summary, review summary, and technical considerations for one capture group.",
+    "build_session_summary": "Combines implementation scope and review flow across groups.",
+    "technical_considerations": "Extracts technical consideration categories from prompts, responses, and changed filenames.",
+    "implementation_summary": "Creates a file-level implementation summary instead of line-by-line descriptions.",
+    "review_summary": "Organizes review and verification statements into session-step summaries.",
+    "extractDeclarations": "Extracts added function, class, and type declarations from a diff for node summaries.",
+    "codexThreadName": "Searches session_index.jsonl in reverse for a Codex session's conversation title.",
+    "codexHome": "Safely resolves CODEX_HOME and home-relative paths to find local Codex data.",
+    "formatTitleLabel": "Shortens a long conversation title for the window title and header badge.",
+    "_flatten_hunk_lines": "Collects added and removed lines from diff hunks into one analysis input.",
+    "_summarize_code_intent": "Finds signals such as await, React setters, and imports in changed code for a file-level summary.",
 }
 
 
@@ -212,17 +212,17 @@ def _implementation_lines_for_file(file_path: str, added: list[str], removed: li
     lines: list[str] = []
 
     if re.search(r"codexThreadName|CODEFLOW_SESSION_TITLE|sessionTitle", joined):
-        lines.append("Codex 세션 id로 채팅 제목을 찾아 Electron 창 제목과 renderer query에 전달합니다.")
+        lines.append("Finds the chat title from a Codex session ID and passes it to the Electron window title and renderer query.")
     elif re.search(r"WINDOW_SESSION_TITLE|session_title", joined):
-        lines.append("Electron이 넘긴 채팅 제목을 화면 헤더 배지에 표시하고 hash는 fallback으로만 씁니다.")
+        lines.append("Shows the Electron-provided chat title in the header badge and uses the hash only as a fallback.")
     elif re.search(r"enrich_session_response|build_session_summary|technical_considerations", joined):
-        lines.append("세션 group에 구현/리뷰 단계와 기술 고려사항 요약을 붙입니다.")
+        lines.append("Adds implementation/review steps and technical considerations to session groups.")
     elif re.search(r"buildImplementationSummary|selectCoreReviewLines|describeCoreLine", joined):
-        lines.append("라인별 코드 설명을 제거하고 파일/단계 중심 요약으로 전환합니다.")
+        lines.append("Replaces line-by-line code descriptions with file- and step-focused summaries.")
     elif re.search(r"_summarize_code_intent|_flatten_hunk_lines", joined):
-        lines.append("백엔드 기본 문서가 diff 라인을 분석해 구현 의도를 담은 fallback 설명을 만들도록 합니다.")
+        lines.append("Makes the backend fallback documentation infer implementation intent from diff lines.")
     elif "tests/" in file_path or re.search(r"assert .*핵심|assert .*구현|test_", joined):
-        lines.append("새 설명 생성 방식이 실제 구현 요약을 내는지 테스트로 고정합니다.")
+        lines.append("Tests that the new description generator produces meaningful implementation summaries.")
 
     for name in _extract_declarations(added):
         description = _KNOWN_IMPLEMENTATIONS.get(name)
@@ -230,7 +230,7 @@ def _implementation_lines_for_file(file_path: str, added: list[str], removed: li
             lines.append(f"`{name}`: {description}")
 
     if any(re.search(r"라인 변화|핵심 흐름|추가된 코드 예", line) for line in removed):
-        lines.append("라인 수, 추상 분류, 임의 코드 예시를 앞세우던 설명 문구를 제거했습니다.")
+        lines.append("Removes descriptions centered on line counts, abstract categories, and arbitrary code examples.")
 
     return _unique(lines)
 
@@ -266,45 +266,45 @@ def _fill_edge_default(edge: ChangeEdge, graph: ChangeGraph) -> None:
     src = nodes_by_id.get(edge.source)
     tgt = nodes_by_id.get(edge.target)
 
-    kind_ko = _EDGE_KIND_KO.get(edge.kind, edge.kind)
+    kind_label = _EDGE_KIND_LABEL.get(edge.kind, edge.kind)
     src_label = src.label if src else edge.source
     tgt_label = tgt.label if tgt else edge.target
 
     if not edge.summary:
         if edge.kind == "contains":
-            edge.summary = f"`{src_label}` 가 `{tgt_label}` 를 포함합니다."
+            edge.summary = f"`{src_label}` contains `{tgt_label}`."
         elif edge.kind == "calls":
-            edge.summary = f"`{src_label}` 가 `{tgt_label}` 를 참조합니다."
+            edge.summary = f"`{src_label}` references `{tgt_label}`."
         elif edge.kind == "imports":
-            edge.summary = f"`{src_label}` 가 `{tgt_label}` 를 import합니다."
+            edge.summary = f"`{src_label}` imports `{tgt_label}`."
         elif edge.kind == "referenced_by":
-            edge.summary = f"`{src_label}` 에서 `{tgt_label}` 를 사용합니다."
+            edge.summary = f"`{src_label}` uses `{tgt_label}`."
         elif edge.kind == "renamed_from":
-            edge.summary = f"`{src_label}` 가 `{tgt_label}` 로 이름이 바뀌었습니다."
+            edge.summary = f"`{src_label}` was renamed to `{tgt_label}`."
         elif edge.kind == "modifies":
-            edge.summary = f"`{src_label}` 의 변경이 `{tgt_label}` 에 적용됩니다."
+            edge.summary = f"Changes in `{src_label}` apply to `{tgt_label}`."
         else:
-            edge.summary = f"`{src_label}` → `{tgt_label}` ({kind_ko})"
+            edge.summary = f"`{src_label}` → `{tgt_label}` ({kind_label})"
 
     if edge.body:
         return
 
-    lines: list[str] = [f"- **관계**: {kind_ko}"]
+    lines: list[str] = [f"- **Relationship**: {kind_label}"]
     if src:
         lines.append(
-            f"- **출발**: `{src.label}` "
-            f"({_SYMBOL_LABEL_KO.get(src.symbol_kind, src.symbol_kind)}, {src.file})"
+            f"- **Source**: `{src.label}` "
+            f"({_SYMBOL_LABEL.get(src.symbol_kind, src.symbol_kind)}, {src.file})"
         )
     if tgt:
         lines.append(
-            f"- **도착**: `{tgt.label}` "
-            f"({_SYMBOL_LABEL_KO.get(tgt.symbol_kind, tgt.symbol_kind)}, {tgt.file})"
+            f"- **Target**: `{tgt.label}` "
+            f"({_SYMBOL_LABEL.get(tgt.symbol_kind, tgt.symbol_kind)}, {tgt.file})"
         )
     if edge.kind == "imports":
         lines.append("")
-        lines.append("> 이 엣지는 현재 파일이 다른 프로젝트 파일의 기능을 import해서 사용하는 관계입니다.")
+        lines.append("> This edge shows the current file importing functionality from another project file.")
     if src and src.summary:
-        lines.append(f"- **출발 요약**: {src.summary}")
+        lines.append(f"- **Source summary**: {src.summary}")
     if tgt and tgt.summary:
-        lines.append(f"- **도착 요약**: {tgt.summary}")
+        lines.append(f"- **Target summary**: {tgt.summary}")
     edge.body = "\n".join(lines)

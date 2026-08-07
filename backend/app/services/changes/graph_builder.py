@@ -406,7 +406,7 @@ def _add_import_edges(graph: ChangeGraph, diff: GitDiffResult, max_edges: int = 
                     language=_language_for_path(target_file),
                     symbol_kind="file",
                     status="unchanged",
-                    summary=f"{source_node.file}에서 import됨",
+                    summary=f"Imported by {source_node.file}",
                 )
                 if target_node.id not in seen_node_ids:
                     graph.nodes.append(target_node)
@@ -422,15 +422,15 @@ def _add_import_edges(graph: ChangeGraph, diff: GitDiffResult, max_edges: int = 
 
             imported_items = ", ".join(ref.names) if ref.names else ref.module
             edge_body = [
-                f"- **관계**: import",
-                f"- **출발 파일**: `{source_node.file}`",
-                f"- **가져오는 파일**: `{target_file}`",
-                f"- **가져오는 기능**: `{imported_items}`",
+                f"- **Relationship**: import",
+                f"- **Source file**: `{source_node.file}`",
+                f"- **Imported file**: `{target_file}`",
+                f"- **Imported symbols**: `{imported_items}`",
             ]
             if ref.line:
-                edge_body.append(f"- **import 위치**: {ref.line} 행")
+                edge_body.append(f"- **Import location**: line {ref.line}")
             if ref.syntax:
-                edge_body.append(f"- **import 문**: `{ref.syntax}`")
+                edge_body.append(f"- **Import statement**: `{ref.syntax}`")
 
             graph.edges.append(
                 ChangeEdge(
@@ -439,7 +439,7 @@ def _add_import_edges(graph: ChangeGraph, diff: GitDiffResult, max_edges: int = 
                     target=target_node.id,
                     kind="imports",
                     label="imports",
-                    summary=f"`{source_node.file}` 가 `{target_file}` 를 import합니다.",
+                    summary=f"`{source_node.file}` imports `{target_file}`.",
                     body="\n".join(edge_body),
                 )
             )
@@ -468,7 +468,7 @@ def _add_import_edges(graph: ChangeGraph, diff: GitDiffResult, max_edges: int = 
                     language=importer_language,
                     symbol_kind="file",
                     status="unchanged",
-                    summary=f"{target_file}를 import해서 사용함",
+                    summary=f"Imports and uses {target_file}",
                 )
                 if importer_node.id not in seen_node_ids:
                     graph.nodes.append(importer_node)
@@ -494,15 +494,15 @@ def _add_import_edges(graph: ChangeGraph, diff: GitDiffResult, max_edges: int = 
                     target=target_node.id,
                     kind="imports",
                     label="imports",
-                    summary=f"`{importer_file}` 가 변경 파일 `{target_file}` 를 import해서 사용합니다.",
+                    summary=f"`{importer_file}` imports and uses changed file `{target_file}`.",
                     body="\n".join(
                         [
-                            "- **관계**: import 사용처",
-                            f"- **사용하는 파일**: `{importer_file}`",
-                            f"- **변경 파일**: `{target_file}`",
-                            f"- **가져오는 기능**: `{imported_items}`",
-                            f"- **import 위치**: {ref.line} 행" if ref.line else "",
-                            f"- **import 문**: `{ref.syntax}`" if ref.syntax else "",
+                            "- **Relationship**: import usage",
+                            f"- **Importing file**: `{importer_file}`",
+                            f"- **Changed file**: `{target_file}`",
+                            f"- **Imported symbols**: `{imported_items}`",
+                            f"- **Import location**: line {ref.line}" if ref.line else "",
+                            f"- **Import statement**: `{ref.syntax}`" if ref.syntax else "",
                         ]
                     ).strip(),
                 )

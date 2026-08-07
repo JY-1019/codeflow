@@ -10,13 +10,67 @@ from .workflow import build_markdown_workflow_runs
 
 
 PHASE_LABELS: dict[str, str] = {
-    "implementation": "구현",
-    "review": "리뷰",
-    "review_fix": "리뷰 반영",
-    "verification": "검증",
-    "planning": "정리",
+    "implementation": "Implementation",
+    "review": "Review",
+    "review_fix": "Review fix",
+    "verification": "Verification",
+    "planning": "Planning",
 }
 DIFF_STEP_KINDS = {"implementation", "review_fix"}
+LEGACY_STEP_LABELS = {
+    "preflight": ("사전 확인", "Preflight"),
+    "markdown": ("Markdown 명령 해석", "Parse Markdown command"),
+    "branch": ("작업 브랜치 준비", "Prepare work branch"),
+    "implementation": ("구현 작업", "Implementation"),
+    "review": ("리뷰 실행", "Run review"),
+    "review_fix": ("리뷰 반영", "Apply review fixes"),
+    "verification": ("검증", "Verification"),
+    "commit": ("커밋", "Commit"),
+    "push": ("브랜치 푸시", "Push branch"),
+    "merge": ("main 병합/푸시", "Merge/push main"),
+}
+LEGACY_STEP_SUMMARIES = {
+    "preflight": {
+        "저장소와 리뷰 실행 조건을 확인했습니다.": "Checked the repository and review prerequisites.",
+        "저장소 상태, 기준 브랜치, 리뷰 명령 가능 여부를 확인합니다.": "Checks repository status, the base branch, and review command availability.",
+    },
+    "markdown": {
+        "Markdown 요청을 구현 단위로 기록했습니다.": "Recorded the Markdown request as an implementation unit.",
+        "Markdown 파일 또는 현재 요청을 하나의 구현 단위로 읽습니다.": "Reads the Markdown file or current request as one implementation unit.",
+    },
+    "branch": {
+        "Markdown 단위 작업 브랜치를 준비했습니다.": "Prepared a work branch for the Markdown unit.",
+        "Markdown 단위별 작업 브랜치를 기준 브랜치에서 준비합니다.": "Prepares a work branch for each Markdown unit from the base branch.",
+    },
+    "implementation": {
+        "구현 단계가 기록되었습니다.": "Recorded the implementation step.",
+        "구현 작업 내용을 아직 diff에서 찾지 못했습니다.": "No implementation details have been found in the diff yet.",
+    },
+    "review": {
+        "리뷰 결과를 기록했습니다.": "Recorded the review result.",
+        "리뷰 명령을 실행해 정확성/설계 지적사항을 확인합니다.": "Runs a review command to find correctness and design issues.",
+    },
+    "review_fix": {
+        "리뷰 반영 단계가 기록되었습니다.": "Recorded the review-fix step.",
+        "리뷰 지적사항이 있으면 수정하고 다시 리뷰합니다.": "Applies review findings, then runs review again.",
+    },
+    "verification": {
+        "검증 결과를 기록했습니다.": "Recorded the verification result.",
+        "리뷰 이후 필요한 좁은 검증을 실행합니다.": "Runs focused verification after review.",
+    },
+    "commit": {
+        "커밋 결과를 기록했습니다.": "Recorded the commit result.",
+        "해당 Markdown 단위에 속한 파일만 커밋합니다.": "Commits only files belonging to the current Markdown unit.",
+    },
+    "push": {
+        "브랜치 푸시 결과를 기록했습니다.": "Recorded the branch push result.",
+        "파일 브랜치를 origin에 푸시합니다.": "Pushes the file branch to origin.",
+    },
+    "merge": {
+        "main 병합/푸시 결과를 기록했습니다.": "Recorded the main merge/push result.",
+        "파일 브랜치를 main에 통합하고 main을 푸시합니다.": "Integrates the file branch into main and pushes main.",
+    },
+}
 
 
 def enrich_session_response(response: dict[str, Any]) -> dict[str, Any]:
@@ -34,6 +88,8 @@ def enrich_session_response(response: dict[str, Any]) -> dict[str, Any]:
 
 def enrich_group(group: dict[str, Any], sequence: int) -> dict[str, Any]:
     enriched = deepcopy(group)
+    if "name" in enriched:
+        enriched["name"] = _localized_command_label(str(enriched.get("name") or ""))
     graph = _graph(enriched)
     prompt = str(enriched.get("user_prompt") or "")
     response = clean_captured_text(
@@ -181,7 +237,7 @@ def implementation_summary(file_nodes: list[dict[str, Any]], response: str) -> l
         return items[:5]
 
     if not file_nodes:
-        return ["이 단계에서 새 diff 파일은 감지되지 않았습니다."]
+        return ["No new diff files were detected in this step."]
 
     return [
         f"`{node.get('file')}`: {status_label(str(node.get('status') or 'modified'))}, "
@@ -210,9 +266,9 @@ def review_summary(prompt: str, response: str, phase: str) -> list[str]:
     if items:
         return items[:5]
     if phase == "review":
-        return ["리뷰 단계로 기록됐지만 요약 가능한 지적사항 문장은 감지되지 않았습니다."]
+        return ["This was recorded as a review step, but no review findings could be summarized."]
     if phase == "review_fix":
-        return ["리뷰에서 나온 수정 요청을 반영한 구현 단계입니다."]
+        return ["This implementation step addresses changes requested during review."]
     return []
 
 
@@ -224,43 +280,43 @@ def technical_considerations(
     text = f"{prompt}\n{response}\n{_files_text(graph)}".lower()
     checks: list[tuple[str, str, list[str]]] = [
         (
-            "리뷰 루프",
-            "구현과 리뷰 결과가 같은 세션 흐름 안에서 이어지도록 단계 정보를 유지합니다.",
+            "Review loop",
+            "Keeps implementation and review results connected in the same session flow.",
             ["review", "리뷰", "검토", "finding", "actionable"],
         ),
         (
-            "세션 지속성",
-            "대화 thread와 project root 기준으로 group을 저장하고 다시 불러옵니다.",
+            "Session persistence",
+            "Stores and reloads groups by conversation thread and project root.",
             ["session", "세션", "thread", "group", "store", "capture"],
         ),
         (
-            "Diff 경계",
-            "누적 branch diff에서 이번 capture에 해당하는 파일만 분리해 세션 노이즈를 줄입니다.",
+            "Diff boundary",
+            "Reduces session noise by isolating files from the current capture within the cumulative branch diff.",
             ["diff", "branch", "delta", "git", "변경"],
         ),
         (
-            "UI 흐름",
-            "파일 단위 설명보다 구현/리뷰 단계와 최종 요약을 먼저 읽을 수 있게 화면을 구성합니다.",
+            "UI flow",
+            "Prioritizes implementation/review steps and the final summary over file-level details.",
             ["frontend", "react", "ui", "화면", "패널", "flow", "visual"],
         ),
         (
-            "백엔드 API",
-            "FastAPI 응답이 그래프와 세션 요약을 함께 제공하도록 계약을 확장합니다.",
+            "Backend API",
+            "Extends the FastAPI contract to return the graph and session summary together.",
             ["backend", "api", "fastapi", "router", "service"],
         ),
         (
-            "자동화 Skill",
-            "Codex/Claude skill capture가 외부 LLM 없이 로컬 backend에 세션 이벤트를 남깁니다.",
+            "Automation skill",
+            "Lets Codex and Claude skills record session events in the local backend without an external LLM.",
             ["skill", "codex", "claude", "capture", "automation"],
         ),
         (
-            "검증",
-            "작은 단위 테스트와 타입 체크로 세션 요약/렌더링 회귀를 잡는 흐름을 유지합니다.",
+            "Verification",
+            "Uses focused tests and type checks to catch session summary and rendering regressions.",
             ["test", "pytest", "typecheck", "검증", "테스트"],
         ),
         (
-            "데이터 모델",
-            "group, phase, summary, graph를 분리해 시각화와 상세 패널이 같은 사실 데이터를 공유합니다.",
+            "Data model",
+            "Separates group, phase, summary, and graph data so visualizations and detail panels share the same facts.",
             ["type", "interface", "model", "schema", "summary"],
         ),
     ]
@@ -274,11 +330,11 @@ def technical_considerations(
 
 def status_label(status: str) -> str:
     return {
-        "added": "추가",
-        "modified": "수정",
-        "deleted": "삭제",
-        "renamed": "이름 변경",
-    }.get(status, status or "변경")
+        "added": "Added",
+        "modified": "Modified",
+        "deleted": "Deleted",
+        "renamed": "Renamed",
+    }.get(status, status or "Changed")
 
 
 def _graph(group: dict[str, Any]) -> dict[str, Any]:
@@ -293,11 +349,22 @@ def _clean_workflow_runs(value: Any) -> list[dict[str, Any]]:
     for run in value:
         if not isinstance(run, dict):
             continue
+        legacy_generated = _is_legacy_generated_run(run)
         steps: list[dict[str, Any]] = []
         for step in run.get("steps") or []:
             if not isinstance(step, dict):
                 continue
             cleaned_step = deepcopy(step)
+            if legacy_generated:
+                kind = str(cleaned_step.get("kind") or "")
+                if "label" in cleaned_step:
+                    cleaned_step["label"] = _localized_step_label(
+                        kind, str(cleaned_step.get("label") or "")
+                    )
+                if "summary" in cleaned_step:
+                    cleaned_step["summary"] = _localized_step_summary(
+                        kind, str(cleaned_step.get("summary") or "")
+                    )
             step_graph = cleaned_step.get("graph")
             if isinstance(step_graph, dict):
                 cleaned_step["graph"] = clean_graph_docs(step_graph)
@@ -316,14 +383,19 @@ def _clean_workflow_runs(value: Any) -> list[dict[str, Any]]:
 
 def _workflow_skill_label(skill: str, label: str) -> str:
     known = {
-        "markdown-branch-push": "Markdown 브랜치 푸시",
-        "markdown-branch-commit": "Markdown 브랜치 커밋",
-        "captured-turn": "캡처된 턴",
-        "codeflow": "Codeflow 작업 기록",
-        "general": "일반 작업 기록",
-        "Markdown Branch Push": "Markdown 브랜치 푸시",
-        "Markdown Branch Commit": "Markdown 브랜치 커밋",
-        "Captured turn": "캡처된 턴",
+        "markdown-branch-push": "Markdown Branch Push",
+        "markdown-branch-commit": "Markdown Branch Commit",
+        "captured-turn": "Captured turn",
+        "codeflow": "Codeflow capture",
+        "general": "General capture",
+        "Markdown Branch Push": "Markdown Branch Push",
+        "Markdown Branch Commit": "Markdown Branch Commit",
+        "Captured turn": "Captured turn",
+        "Markdown 브랜치 푸시": "Markdown Branch Push",
+        "Markdown 브랜치 커밋": "Markdown Branch Commit",
+        "캡처된 턴": "Captured turn",
+        "Codeflow 작업 기록": "Codeflow capture",
+        "일반 작업 기록": "General capture",
     }
     cleaned = label.strip() or skill.strip()
     return known.get(cleaned, known.get(skill.strip(), cleaned))
@@ -332,12 +404,49 @@ def _workflow_skill_label(skill: str, label: str) -> str:
 def _localized_command_label(label: str) -> str:
     cleaned = label.strip()
     replacements = {
-        "Markdown Branch Push": "Markdown 브랜치 푸시",
-        "Markdown Branch Commit": "Markdown 브랜치 커밋",
-        "Captured turn": "캡처된 턴",
+        "Markdown 브랜치 푸시": "Markdown Branch Push",
+        "Markdown 브랜치 커밋": "Markdown Branch Commit",
+        "캡처된 턴": "Captured turn",
     }
     for source, target in replacements.items():
-        cleaned = cleaned.replace(source, target)
+        if cleaned == source or cleaned.startswith(f"{source} · "):
+            return target + cleaned[len(source):]
+    return cleaned
+
+
+def _is_legacy_generated_run(run: dict[str, Any]) -> bool:
+    return str(run.get("skill_label") or "").strip() in {
+        "Markdown 브랜치 푸시",
+        "Markdown 브랜치 커밋",
+        "캡처된 턴",
+        "Codeflow 작업 기록",
+        "일반 작업 기록",
+    } or _localized_command_label(str(run.get("command_label") or "")) != str(
+        run.get("command_label") or ""
+    ).strip()
+
+
+def _localized_step_label(kind: str, value: str) -> str:
+    cleaned = value.strip()
+    legacy = LEGACY_STEP_LABELS.get(kind)
+    return legacy[1] if legacy and cleaned == legacy[0] else cleaned
+
+
+def _localized_step_summary(kind: str, value: str) -> str:
+    cleaned = value.strip()
+    known = LEGACY_STEP_SUMMARIES.get(kind, {}).get(cleaned)
+    if known:
+        return known
+    if kind not in {"implementation", "review_fix"}:
+        return cleaned
+    match = re.fullmatch(r"(\d+)개 파일 diff를 기록했습니다\.", cleaned)
+    if match:
+        count = int(match.group(1))
+        return f"Recorded a diff for {count} file{'s' if count != 1 else ''}."
+    match = re.fullmatch(r"(\d+)개 파일을 변경했습니다\.", cleaned)
+    if match:
+        count = int(match.group(1))
+        return f"Changed {count} file{'s' if count != 1 else ''}."
     return cleaned
 
 

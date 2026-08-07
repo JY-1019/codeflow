@@ -11,10 +11,10 @@ const KIND_CONFIG: Record<
   string,
   { label: string; color: string; icon: string }
 > = {
-  changed: { label: "변경", color: "#60a5fa", icon: "✎" },
-  affected: { label: "영향", color: "#a855f7", icon: "↘" },
-  context: { label: "맥락", color: "#f59e0b", icon: "✦" },
-  file: { label: "파일", color: "#94a3b8", icon: "▣" },
+  changed: { label: "Changed", color: "#60a5fa", icon: "✎" },
+  affected: { label: "Affected", color: "#a855f7", icon: "↘" },
+  context: { label: "Context", color: "#f59e0b", icon: "✦" },
+  file: { label: "File", color: "#94a3b8", icon: "▣" },
 };
 
 /**
@@ -143,10 +143,10 @@ export const ChangeNodeView = memo(({ data, selected }: NodeProps) => {
               ? "bg-purple-600/25 text-purple-300"
               : "bg-slate-700/50 text-slate-500"
           }`}
-          title={hasBody ? "AI 응답에서 매핑된 설명 있음" : "매핑된 설명 없음"}
+          title={hasBody ? "Mapped description available" : "No mapped description"}
         >
           <Book className="h-3 w-3" />
-          설명
+          Details
         </button>
         <button
           className={`flex flex-1 items-center justify-center gap-1 rounded px-2 py-1 text-[10px] transition-colors ${
@@ -154,7 +154,7 @@ export const ChangeNodeView = memo(({ data, selected }: NodeProps) => {
               ? "bg-emerald-600/25 text-emerald-300"
               : "bg-slate-700/50 text-slate-500"
           }`}
-          title={hasSnippet ? "diff snippet 있음" : "snippet 없음"}
+          title={hasSnippet ? "Diff snippet available" : "No diff snippet"}
         >
           <Code className="h-3 w-3" />
           Diff
@@ -175,19 +175,19 @@ export const ChangeNodeView = memo(({ data, selected }: NodeProps) => {
 ChangeNodeView.displayName = "ChangeNodeView";
 
 function symbolKindLabel(kind: string): string {
-  if (kind === "file") return "파일";
-  if (kind === "function") return "함수";
-  if (kind === "method") return "메서드";
-  if (kind === "class") return "클래스";
-  if (kind === "module") return "모듈";
-  return kind || "파일";
+  if (kind === "file") return "File";
+  if (kind === "function") return "Function";
+  if (kind === "method") return "Method";
+  if (kind === "class") return "Class";
+  if (kind === "module") return "Module";
+  return kind || "File";
 }
 
 function statusLabel(status: string): string {
-  if (status === "added") return "추가";
-  if (status === "modified") return "수정";
-  if (status === "deleted") return "삭제";
-  if (status === "renamed") return "이름 변경";
-  if (status === "unchanged") return "변경 없음";
-  return status || "변경";
+  if (status === "added") return "Added";
+  if (status === "modified") return "Modified";
+  if (status === "deleted") return "Deleted";
+  if (status === "renamed") return "Renamed";
+  if (status === "unchanged") return "Unchanged";
+  return status || "Changed";
 }

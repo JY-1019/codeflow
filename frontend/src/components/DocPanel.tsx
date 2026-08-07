@@ -63,7 +63,7 @@ export function DocPanel({
   if (!graph) {
     return (
       <div className="flex h-full min-h-0 min-w-0 items-center justify-center overflow-hidden px-4 text-center text-[12px] text-slate-500">
-        세션이나 diff를 불러오면 요약이 여기에 표시됩니다.
+        Load a session or diff to see its summary here.
       </div>
     );
   }
@@ -94,10 +94,10 @@ function GroupDoc({ group }: { group: ChangeGroup }) {
       <div className="flex items-center justify-between gap-2">
         <div>
           <div className="text-[10px] uppercase tracking-wider text-slate-500">
-            단계 {group.sequence ?? ""}
+            Step {group.sequence ?? ""}
           </div>
           <div className="mt-0.5 text-base font-semibold text-slate-100">
-            {group.phase_label ?? "구현"} · {group.name}
+            {group.phase_label ?? "Implementation"} · {group.name}
           </div>
         </div>
         <span className="rounded bg-slate-800 px-2 py-1 text-[10px] uppercase tracking-wider text-slate-300">
@@ -106,19 +106,19 @@ function GroupDoc({ group }: { group: ChangeGroup }) {
       </div>
 
       <div className="mt-3 grid grid-cols-2 gap-2 text-[12px] text-slate-300">
-        <Stat label="파일" value={summary?.file_count ?? group.graph.nodes.length} />
-        <Stat label="루프" value={workflowFlowStepCount || summary?.workflow_step_count || 1} />
-        <Stat label="추가" value={`+${summary?.added_lines ?? 0}`} tone="emerald" />
-        <Stat label="삭제" value={`-${summary?.removed_lines ?? 0}`} tone="rose" />
+        <Stat label="Files" value={summary?.file_count ?? group.graph.nodes.length} />
+        <Stat label="Steps" value={workflowFlowStepCount || summary?.workflow_step_count || 1} />
+        <Stat label="Added" value={`+${summary?.added_lines ?? 0}`} tone="emerald" />
+        <Stat label="Removed" value={`-${summary?.removed_lines ?? 0}`} tone="rose" />
       </div>
 
-      <Section icon={MessageSquareText} title="사용자 질의">
+      <Section icon={MessageSquareText} title="User prompt">
         <MarkdownBlock>
-          {group.user_prompt || "_사용자 질의가 기록되지 않았습니다._"}
+          {group.user_prompt || "_No user prompt was recorded._"}
         </MarkdownBlock>
       </Section>
 
-      <Section icon={Sparkles} title="그룹 처리 내용">
+      <Section icon={Sparkles} title="Group activity">
         <GroupNarrative
           implementation={implementation}
           review={review}
@@ -127,14 +127,14 @@ function GroupDoc({ group }: { group: ChangeGroup }) {
       </Section>
 
       {workflowRuns.length > 0 ? (
-        <Section icon={SearchCheck} title="리뷰 루프 상태">
+        <Section icon={SearchCheck} title="Review loop status">
           <WorkflowRunList runs={workflowRuns} />
         </Section>
       ) : null}
 
       <Considerations items={considerations} />
 
-      <Section icon={FileText} title="변경 파일">
+      <Section icon={FileText} title="Changed files">
         <FileDiffList fileNodes={fileNodes} fallbackFiles={files} />
       </Section>
     </div>
@@ -163,13 +163,13 @@ function WorkflowStepDoc({ item }: { item: SelectedWorkflowStepDetails }) {
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="text-[10px] uppercase tracking-wider text-slate-500">
-            {stepKindLabel(step.kind)} 노드
+            {stepKindLabel(step.kind)} node
           </div>
           <div className="mt-0.5 text-base font-semibold leading-snug text-slate-100">
             {step.label}
           </div>
           <div className="mt-1 text-[12px] leading-relaxed text-slate-400">
-            그룹 {group.sequence ?? ""} · {group.name}
+            Group {group.sequence ?? ""} · {group.name}
             {run ? ` · ${workflowSkillLabel(run.skill, run.skill_label)}` : ""}
             {agentLabel ? ` · ${agentLabel}` : ""}
           </div>
@@ -181,29 +181,29 @@ function WorkflowStepDoc({ item }: { item: SelectedWorkflowStepDetails }) {
       </div>
 
       <div className="mt-3 grid grid-cols-2 gap-2 text-[12px] text-slate-300">
-        <Stat label="노드" value={stepKindLabel(step.kind)} />
-        <Stat label="상태" value={statusLabel(step.status)} />
+        <Stat label="Node" value={stepKindLabel(step.kind)} />
+        <Stat label="Status" value={statusLabel(step.status)} />
         {showsDiff ? (
           <>
-            <Stat label="추가" value={`+${added}`} tone="emerald" />
-            <Stat label="삭제" value={`-${removed}`} tone="rose" />
+            <Stat label="Added" value={`+${added}`} tone="emerald" />
+            <Stat label="Removed" value={`-${removed}`} tone="rose" />
           </>
         ) : (
           <>
-            <Stat label="파일" value="-" />
-            <Stat label="Diff" value="없음" />
+            <Stat label="Files" value="-" />
+            <Stat label="Diff" value="None" />
           </>
         )}
       </div>
 
       <Section icon={stepSectionIcon(step.kind)} title={stepPrimaryTitle(step.kind)}>
         <MarkdownBlock>
-          {content || "_이 노드에 기록된 요약이 없습니다._"}
+          {content || "_No summary was recorded for this node._"}
         </MarkdownBlock>
       </Section>
 
       {showsDiff ? (
-        <Section icon={GitCompareArrows} title="전체 Diff">
+        <Section icon={GitCompareArrows} title="Full diff">
           <FileDiffList fileNodes={fileNodes} fallbackFiles={fallbackFiles} />
         </Section>
       ) : null}
@@ -230,8 +230,8 @@ function GroupNarrative({
   if (!hasStructuredSteps) {
     return (
       <div className="space-y-3">
-        <NarrativeBlock title="구현/처리한 내용" items={implementation} empty="구현 내용이 아직 없습니다." />
-        <NarrativeBlock title="리뷰 또는 검증한 내용" items={review} empty="리뷰나 검증 내용이 아직 없습니다." />
+        <NarrativeBlock title="Implementation activity" items={implementation} empty="No implementation details yet." />
+        <NarrativeBlock title="Review or verification activity" items={review} empty="No review or verification details yet." />
       </div>
     );
   }
@@ -239,30 +239,30 @@ function GroupNarrative({
   return (
     <div className="space-y-3">
       <NarrativeBlock
-        title="구현한 내용"
+        title="Implementation"
         items={[
           ...withoutExactText(implementation, reviewFixItems),
           ...implementationStepItems,
         ]}
-        empty="구현 내용이 아직 없습니다."
+        empty="No implementation details yet."
       />
       <NarrativeBlock
-        title="리뷰 내용"
+        title="Review"
         items={[
           ...withoutExactText(review, verificationItems),
           ...reviewStepItems,
         ]}
-        empty="리뷰 내용이 아직 없습니다."
+        empty="No review details yet."
       />
       <NarrativeBlock
-        title="리뷰 반영 내용"
+        title="Review fixes"
         items={reviewFixItems}
-        empty="반영할 리뷰 지적사항이 없거나 아직 기록되지 않았습니다."
+        empty="No review findings needed fixing, or none have been recorded yet."
       />
       <NarrativeBlock
-        title="검증 내용"
+        title="Verification"
         items={verificationItems}
-        empty="검증 기록이 아직 없습니다."
+        empty="No verification details yet."
       />
     </div>
   );
@@ -311,7 +311,7 @@ function WorkflowRunList({ runs }: { runs: MarkdownWorkflowRun[] }) {
                 </div>
               </div>
               <span className="shrink-0 rounded bg-slate-800 px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-slate-300">
-                {run.status === "completed" ? "완료" : run.status === "blocked" ? "차단" : "진행"}
+                {run.status === "completed" ? "Completed" : run.status === "blocked" ? "Blocked" : "In progress"}
               </span>
             </div>
             {run.markdown_path || run.branch_name ? (
@@ -357,7 +357,7 @@ function WorkflowStepList({ steps }: { steps: MarkdownWorkflowStep[] }) {
                   {agentLabel ? (
                     <span
                       className="inline-flex items-center gap-1 rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-300"
-                      title={`수행 주체: ${agentLabel}`}
+                      title={`Agent: ${agentLabel}`}
                     >
                       <Bot className="h-3 w-3" />
                       <span className="max-w-[96px] truncate">{agentLabel}</span>
@@ -400,37 +400,37 @@ function stepPrimaryContent({ run, step }: SelectedWorkflowStepDetails): string 
     if (markdownContent) {
       parts.push(markdownContent);
     } else if (run?.markdown_path) {
-      parts.push(`Markdown 파일: \`${run.markdown_path}\``);
+      parts.push(`Markdown file: \`${run.markdown_path}\``);
     }
   }
   return uniqueText(parts).join("\n\n");
 }
 
 function stepPrimaryTitle(kind: MarkdownWorkflowStep["kind"]): string {
-  if (kind === "preflight") return "확인 내용";
-  if (kind === "markdown") return "Markdown 명령";
-  if (kind === "branch") return "브랜치 준비";
-  if (kind === "implementation") return "구현 내용 요약";
-  if (kind === "review") return "리뷰 요약";
-  if (kind === "review_fix") return "리뷰 반영 요약";
-  if (kind === "verification") return "검증 결과";
-  if (kind === "commit") return "커밋 결과";
-  if (kind === "push") return "푸시 결과";
-  if (kind === "merge") return "병합 결과";
-  return "노드 요약";
+  if (kind === "preflight") return "Preflight details";
+  if (kind === "markdown") return "Markdown command";
+  if (kind === "branch") return "Branch setup";
+  if (kind === "implementation") return "Implementation summary";
+  if (kind === "review") return "Review summary";
+  if (kind === "review_fix") return "Review fix summary";
+  if (kind === "verification") return "Verification result";
+  if (kind === "commit") return "Commit result";
+  if (kind === "push") return "Push result";
+  if (kind === "merge") return "Merge result";
+  return "Node summary";
 }
 
 function stepKindLabel(kind: MarkdownWorkflowStep["kind"]): string {
-  if (kind === "preflight") return "사전 확인";
+  if (kind === "preflight") return "Preflight";
   if (kind === "markdown") return "Markdown";
-  if (kind === "branch") return "브랜치";
-  if (kind === "implementation") return "구현";
-  if (kind === "review") return "리뷰";
-  if (kind === "review_fix") return "리뷰 반영";
-  if (kind === "verification") return "검증";
-  if (kind === "commit") return "커밋";
-  if (kind === "push") return "푸시";
-  if (kind === "merge") return "병합";
+  if (kind === "branch") return "Branch";
+  if (kind === "implementation") return "Implementation";
+  if (kind === "review") return "Review";
+  if (kind === "review_fix") return "Review fix";
+  if (kind === "verification") return "Verification";
+  if (kind === "commit") return "Commit";
+  if (kind === "push") return "Push";
+  if (kind === "merge") return "Merge";
   return kind;
 }
 
@@ -449,30 +449,30 @@ function GraphDoc({ graph }: { graph: ChangeGraphResponse }) {
   return (
     <div className="h-full min-h-0 min-w-0 space-y-4 overflow-y-auto p-3 text-[13px]">
       <div>
-        <div className="text-[10px] uppercase tracking-wider text-slate-500">Diff 요약</div>
+        <div className="text-[10px] uppercase tracking-wider text-slate-500">Diff summary</div>
         <div className="mt-0.5 text-base font-semibold text-slate-100">
-          {files.length}개 파일 · +{added}/-{removed}
+          {files.length} file{files.length === 1 ? "" : "s"} · +{added}/-{removed}
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-2 text-[12px] text-slate-300">
-        <Stat label="노드" value={graph.nodes.length} />
-        <Stat label="관계" value={graph.edges.length} />
-        <Stat label="변경 파일" value={files.length} />
-        <Stat label="영향 파일" value={graph.nodes.filter((n) => n.kind === "affected").length} />
+        <Stat label="Nodes" value={graph.nodes.length} />
+        <Stat label="Relations" value={graph.edges.length} />
+        <Stat label="Changed files" value={files.length} />
+        <Stat label="Affected files" value={graph.nodes.filter((n) => n.kind === "affected").length} />
       </div>
 
-      <Section icon={GitCompareArrows} title="구현 범위">
+      <Section icon={GitCompareArrows} title="Implementation scope">
         {files.length > 0 ? (
           <FileDiffList fileNodes={files} fallbackFiles={files.map((node) => node.file)} />
         ) : (
-          <EmptyLine text="현재 선택된 diff에 직접 변경된 파일이 없습니다." />
+          <EmptyLine text="No files were changed directly in the selected diff." />
         )}
       </Section>
 
       {graph.warnings.length > 0 ? (
         <div className="rounded border border-amber-700/60 bg-amber-950/40 p-2 text-[12px] text-amber-200">
-          <div className="mb-1 font-semibold">경고</div>
+          <div className="mb-1 font-semibold">Warnings</div>
           <ul className="list-disc pl-4">
             {graph.warnings.map((warning, index) => (
               <li key={index}>{warning}</li>
@@ -488,26 +488,26 @@ function NodeDoc({ node }: { node: ChangeNode }) {
   const hunkCount = countHunks(node.snippet);
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col overflow-y-auto p-3 text-[13px]">
-      <div className="text-[10px] uppercase tracking-wider text-slate-500">파일</div>
+      <div className="text-[10px] uppercase tracking-wider text-slate-500">File</div>
       <div className="mt-0.5 text-base font-semibold text-slate-100">{node.label}</div>
       <div className="truncate text-[12px] text-slate-400" title={node.file}>
         {node.file}
       </div>
 
       <div className="mt-3 grid grid-cols-2 gap-2 text-[12px] text-slate-300">
-        <Stat label="상태" value={statusLabelKo(node.status)} />
-        <Stat label="묶음" value={hunkCount || "-"} />
-        <Stat label="추가" value={`+${node.added_lines}`} tone="emerald" />
-        <Stat label="삭제" value={`-${node.removed_lines}`} tone="rose" />
+        <Stat label="Status" value={changeStatusLabel(node.status)} />
+        <Stat label="Hunks" value={hunkCount || "-"} />
+        <Stat label="Added" value={`+${node.added_lines}`} tone="emerald" />
+        <Stat label="Removed" value={`-${node.removed_lines}`} tone="rose" />
       </div>
 
-      <Section icon={Sparkles} title="역할 요약">
+      <Section icon={Sparkles} title="Role summary">
         <MarkdownBlock>
-          {node.body || node.summary || "_이 파일에 대한 요약이 아직 없습니다._"}
+          {node.body || node.summary || "_No summary is available for this file yet._"}
         </MarkdownBlock>
       </Section>
 
-      <Section icon={GitCompareArrows} title="삭제/추가 라인">
+      <Section icon={GitCompareArrows} title="Removed/added lines">
         <RawDiffBlock snippet={node.snippet} />
       </Section>
     </div>
@@ -519,9 +519,9 @@ function EdgeDoc({ edge, graph }: { edge: ChangeEdge; graph: ChangeGraphResponse
   const targetNode = graph.nodes.find((n) => n.id === edge.target);
   return (
     <div className="flex h-full min-h-0 flex-col overflow-y-auto p-3 text-[13px]">
-      <div className="text-[10px] uppercase tracking-wider text-slate-500">관계</div>
+      <div className="text-[10px] uppercase tracking-wider text-slate-500">Relationship</div>
       <div className="mt-0.5 text-base font-semibold text-slate-100">
-        {edge.kind} · {edge.label || "연결"}
+        {edge.kind} · {edge.label || "Connection"}
       </div>
       <div className="mt-1 text-[12px] text-slate-400">
         {sourceNode?.file ?? edge.source}
@@ -529,9 +529,9 @@ function EdgeDoc({ edge, graph }: { edge: ChangeEdge; graph: ChangeGraphResponse
         {targetNode?.file ?? edge.target}
       </div>
 
-      <Section icon={Link2} title="연결 의미">
+      <Section icon={Link2} title="Connection details">
         <MarkdownBlock>
-          {edge.body || edge.summary || "_관계 요약이 아직 없습니다._"}
+          {edge.body || edge.summary || "_No relationship summary is available yet._"}
         </MarkdownBlock>
       </Section>
     </div>
@@ -561,7 +561,7 @@ function Section({
 function Considerations({ items }: { items: TechnicalConsideration[] }) {
   if (items.length === 0) return null;
   return (
-    <Section icon={ShieldCheck} title="기술 고려사항">
+    <Section icon={ShieldCheck} title="Technical considerations">
       <div className="space-y-2">
         {items.map((item) => (
           <div key={item.label} className="rounded-md border border-slate-800 bg-slate-950/45 px-3 py-2">
@@ -601,7 +601,7 @@ function FileDiffList({
         ))}
       </ul>
     ) : (
-      <EmptyLine text="이 단계에 연결된 파일 diff가 없습니다." />
+      <EmptyLine text="No file diff is associated with this step." />
     );
   }
 
@@ -609,6 +609,7 @@ function FileDiffList({
     <div className="space-y-3">
       {fileNodes.map((node) => {
         const isOpen = openFileIds.has(node.id);
+        const hunkCount = countHunks(node.snippet) || 1;
         return (
           <details
             key={node.id}
@@ -631,8 +632,8 @@ function FileDiffList({
                   {node.file}
                 </div>
                 <div className="mt-0.5 flex items-center gap-2 text-[10px] uppercase tracking-wide text-slate-500">
-                  <span>{statusLabelKo(node.status)}</span>
-                  <span>{countHunks(node.snippet) || 1}개 묶음</span>
+                  <span>{changeStatusLabel(node.status)}</span>
+                  <span>{hunkCount} hunk{hunkCount === 1 ? "" : "s"}</span>
                 </div>
               </div>
               <span className="shrink-0 rounded bg-emerald-950/45 px-1.5 py-0.5 font-mono text-[11px] text-emerald-200">
@@ -657,7 +658,7 @@ function FileDiffList({
 function RawDiffBlock({ snippet, compact = false }: { snippet: string; compact?: boolean }) {
   const lines = diffDisplayLines(snippet);
   if (lines.length === 0) {
-    return <EmptyLine text="표시할 삭제/추가 라인이 없습니다." />;
+    return <EmptyLine text="No removed or added lines to display." />;
   }
 
   return (
@@ -832,12 +833,12 @@ function countHunks(snippet: string): number {
   return snippet.split("\n").filter((line) => line.startsWith("@@")).length || 1;
 }
 
-function statusLabelKo(status: string): string {
-  if (status === "added") return "추가";
-  if (status === "modified") return "수정";
-  if (status === "deleted") return "삭제";
-  if (status === "renamed") return "이름 변경";
-  return status || "변경";
+function changeStatusLabel(status: string): string {
+  if (status === "added") return "Added";
+  if (status === "modified") return "Modified";
+  if (status === "deleted") return "Deleted";
+  if (status === "renamed") return "Renamed";
+  return status || "Changed";
 }
 
 function statusIcon(status: MarkdownWorkflowStepStatus) {
@@ -848,11 +849,11 @@ function statusIcon(status: MarkdownWorkflowStepStatus) {
 }
 
 function statusLabel(status: MarkdownWorkflowStepStatus): string {
-  if (status === "completed") return "완료";
-  if (status === "skipped") return "건너뜀";
-  if (status === "blocked") return "차단";
-  if (status === "pending") return "대기";
-  return "미확인";
+  if (status === "completed") return "Completed";
+  if (status === "skipped") return "Skipped";
+  if (status === "blocked") return "Blocked";
+  if (status === "pending") return "Pending";
+  return "Unknown";
 }
 
 function statusClass(status: MarkdownWorkflowStepStatus): string {
@@ -866,14 +867,14 @@ function statusClass(status: MarkdownWorkflowStepStatus): string {
 function workflowSkillLabel(skill: string, label?: string): string {
   const cleaned = label?.trim() || skill.trim();
   const known: Record<string, string> = {
-    "markdown-branch-push": "Markdown 브랜치 푸시",
-    "markdown-branch-commit": "Markdown 브랜치 커밋",
-    "captured-turn": "캡처된 턴",
-    "codeflow": "Codeflow 작업 기록",
-    general: "일반 작업 기록",
-    "Markdown Branch Push": "Markdown 브랜치 푸시",
-    "Markdown Branch Commit": "Markdown 브랜치 커밋",
-    "Captured turn": "캡처된 턴",
+    "markdown-branch-push": "Markdown Branch Push",
+    "markdown-branch-commit": "Markdown Branch Commit",
+    "captured-turn": "Captured turn",
+    "codeflow": "Codeflow capture",
+    general: "General capture",
+    "Markdown Branch Push": "Markdown Branch Push",
+    "Markdown Branch Commit": "Markdown Branch Commit",
+    "Captured turn": "Captured turn",
   };
   return known[cleaned] ?? known[skill] ?? cleaned;
 }

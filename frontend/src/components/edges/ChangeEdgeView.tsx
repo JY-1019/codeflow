@@ -111,7 +111,7 @@ export const ChangeEdgeView = memo((props: EdgeProps) => {
                   ? "bg-purple-600/25 text-purple-300"
                   : "text-slate-500 hover:bg-slate-700"
               }`}
-              title={edgeData.hasBody ? "엣지 설명 있음" : "엣지 설명 없음"}
+              title={edgeData.hasBody ? "Edge description available" : "No edge description"}
               onClick={(e) => {
                 e.stopPropagation();
                 edgeData.onOpenDoc?.(id);

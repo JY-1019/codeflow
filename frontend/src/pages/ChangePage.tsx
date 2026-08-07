@@ -305,7 +305,7 @@ export function ChangePage() {
             className="inline-flex items-center gap-1 rounded bg-cyan-600 px-3 py-1 text-white hover:bg-cyan-500 disabled:opacity-50"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-            세션 갱신
+            Refresh session
           </button>
         </div>
       </header>
@@ -316,10 +316,10 @@ export function ChangePage() {
           className="flex w-full items-center justify-between px-4 py-1.5 text-[11px] uppercase tracking-wider text-slate-400 hover:text-slate-200"
         >
           <span>
-            수동 capture 텍스트{" "}
+            Manual capture text{" "}
             {assistantResponse.trim()
-              ? `· ${assistantResponse.length}자`
-              : "· event/capture가 보내면 자동으로 채워짐"}
+              ? `· ${assistantResponse.length} character${assistantResponse.length === 1 ? "" : "s"}`
+              : "· Filled automatically by event/capture"}
             <CodexUsageInline usage={codexUsage} loading={usageLoading} />
           </span>
           {responseInputOpen ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
@@ -334,7 +334,7 @@ export function ChangePage() {
             <textarea
               value={assistantResponse}
               onChange={(e) => setAssistantResponse(e.target.value)}
-            placeholder="legacy capture용 응답 텍스트"
+            placeholder="Response text for legacy capture"
               rows={4}
               className="w-full resize-y rounded border border-slate-700 bg-slate-950 px-2 py-1.5 text-[12px] text-slate-100 outline-none focus:border-cyan-500"
             />
@@ -360,7 +360,7 @@ export function ChangePage() {
         <button
           onClick={() => setNarrativeOpen((v) => !v)}
           className="absolute right-1 top-1 z-10 inline-flex h-7 w-7 items-center justify-center rounded text-slate-400 hover:bg-slate-700/60 hover:text-slate-100"
-          title={narrativeOpen ? "패널 접기" : "패널 펴기"}
+          title={narrativeOpen ? "Collapse panel" : "Expand panel"}
         >
           {narrativeOpen ? (
             <PanelLeftClose className="h-3.5 w-3.5" />
@@ -424,7 +424,7 @@ export function ChangePage() {
         <div
           onPointerDown={startDocPanelResize}
           className="absolute left-0 top-0 z-20 h-full w-2 cursor-col-resize touch-none bg-transparent hover:bg-cyan-400/25"
-          title="문서 패널 폭 조절"
+          title="Resize document panel"
         />
         <DocPanel
           graph={docGraph}
@@ -474,17 +474,17 @@ function WorkflowOverviewBar({
   const primaryRun = selectedWorkflowStep?.run ?? activeGroup?.workflow_runs?.[0] ?? null;
   const primarySteps = primaryRun?.steps ?? [];
   const selectedStep = selectedWorkflowStep?.step ?? null;
-  const branch = session?.branch || "브랜치 미확인";
+  const branch = session?.branch || "Unknown branch";
   const activeTitle = activeGroup
-    ? `요청 ${activeGroup.sequence ?? ""} · ${activeGroup.name}`
-    : "캡처 대기";
+    ? `Request ${activeGroup.sequence ?? ""} · ${activeGroup.name}`
+    : "Waiting for capture";
 
   return (
     <div className="col-span-3 border-b border-slate-800 bg-slate-900/65 px-4 py-2">
       <div className="grid gap-3 xl:grid-cols-[minmax(220px,0.9fr)_minmax(420px,1.6fr)_minmax(320px,1fr)]">
         <div className="min-w-0">
           <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-            리뷰 루프 세션
+            Review loop session
           </div>
           <div className="mt-0.5 truncate text-[13px] font-semibold text-slate-100" title={activeTitle}>
             {activeTitle}
@@ -499,27 +499,27 @@ function WorkflowOverviewBar({
 
         <div className="grid grid-cols-3 gap-2 md:grid-cols-6">
           <OverviewMetric icon={FileText} label="MD" value={stats.markdownRuns} />
-          <OverviewMetric icon={Code2} label="구현" value={stats.implementationSteps} />
-          <OverviewMetric icon={SearchCheck} label="리뷰" value={stats.reviewSteps} />
-          <OverviewMetric icon={Wrench} label="반영" value={stats.reviewFixSteps} />
-          <OverviewMetric icon={CheckCircle2} label="검증" value={stats.verificationSteps} />
-          <OverviewMetric icon={GitCommitHorizontal} label="파일" value={stats.changedFiles} />
+          <OverviewMetric icon={Code2} label="Implementation" value={stats.implementationSteps} />
+          <OverviewMetric icon={SearchCheck} label="Review" value={stats.reviewSteps} />
+          <OverviewMetric icon={Wrench} label="Fixes" value={stats.reviewFixSteps} />
+          <OverviewMetric icon={CheckCircle2} label="Verification" value={stats.verificationSteps} />
+          <OverviewMetric icon={GitCommitHorizontal} label="Files" value={stats.changedFiles} />
         </div>
 
         <div className="min-w-0 rounded-md border border-slate-800 bg-slate-950/45 px-3 py-2">
           <div className="flex items-center justify-between gap-2">
             <div className="min-w-0">
               <div className="truncate text-[11px] font-semibold text-slate-200" title={primaryRun?.markdown_title || primaryRun?.markdown_path || selectedStep?.label}>
-                {selectedStep ? selectedStep.label : primaryRun?.markdown_title || primaryRun?.markdown_path || "선택된 단계 없음"}
+                {selectedStep ? selectedStep.label : primaryRun?.markdown_title || primaryRun?.markdown_path || "No step selected"}
               </div>
               <div className="mt-0.5 truncate text-[10px] text-slate-500" title={primaryRun?.markdown_path || primaryRun?.command_label || ""}>
-                {selectedStep ? stepKindLabel(selectedStep.kind) : workflowSkillLabel(primaryRun?.skill ?? "", primaryRun?.skill_label) || "워크플로우"}
+                {selectedStep ? stepKindLabel(selectedStep.kind) : workflowSkillLabel(primaryRun?.skill ?? "", primaryRun?.skill_label) || "Workflow"}
               </div>
             </div>
             <div className="shrink-0 text-right text-[10px] text-slate-500">
-              <div>{stats.completedSteps}/{stats.workflowSteps || 0} 완료</div>
+              <div>{stats.completedSteps}/{stats.workflowSteps || 0} completed</div>
               <div className={stats.blockedSteps ? "text-rose-300" : "text-slate-600"}>
-                {stats.blockedSteps ? `${stats.blockedSteps} 차단` : `${stats.pendingSteps} 대기`}
+                {stats.blockedSteps ? `${stats.blockedSteps} blocked` : `${stats.pendingSteps} pending`}
               </div>
             </div>
           </div>
@@ -558,18 +558,18 @@ function CodexUsageInline({
   loading: boolean;
 }) {
   if (loading && !usage) {
-    return <span className="ml-2 text-slate-500">· Codex 사용량 불러오는 중</span>;
+    return <span className="ml-2 text-slate-500">· Loading Codex usage</span>;
   }
   if (!usage?.available) {
-    return <span className="ml-2 text-slate-500">· Codex 사용량 없음</span>;
+    return <span className="ml-2 text-slate-500">· No Codex usage</span>;
   }
   return (
     <span className="ml-2 text-slate-500">
-      · 전체 {formatTokens(usage.all_time.total_tokens)}
+      · All time {formatTokens(usage.all_time.total_tokens)}
       {usage.current_session
-        ? ` · 현재 세션 ${formatTokens(usage.current_session.usage.total_tokens)}`
+        ? ` · Current session ${formatTokens(usage.current_session.usage.total_tokens)}`
         : ""}
-      {usage.rate_limits ? ` · 제한 ${formatLimitInline(usage.rate_limits)}` : ""}
+      {usage.rate_limits ? ` · Limits ${formatLimitInline(usage.rate_limits)}` : ""}
     </span>
   );
 }
@@ -590,13 +590,13 @@ function CodexUsagePanel({
       <div className="mb-2 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
           <BarChart3 className="h-3.5 w-3.5 text-cyan-300" />
-          Codex 사용량
+          Codex usage
         </div>
         <button
           onClick={onRefresh}
           disabled={loading}
           className="inline-flex h-6 w-6 items-center justify-center rounded text-slate-400 hover:bg-slate-800 hover:text-slate-100 disabled:opacity-50"
-          title="Codex 사용량 갱신"
+          title="Refresh Codex usage"
         >
           <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
         </button>
@@ -605,25 +605,25 @@ function CodexUsagePanel({
         <>
           <div className="grid grid-cols-2 gap-2">
             <UsageCard
-              label="지금까지"
+              label="All time"
               value={usage.all_time.total_tokens}
               detail={usageDetail(usage.all_time)}
             />
             <UsageCard
-              label="현재 세션"
+              label="Current session"
               value={current?.usage.total_tokens ?? 0}
-              detail={current ? usageDetail(current.usage) : "세션 매칭 없음"}
+              detail={current ? usageDetail(current.usage) : "No matching session"}
             />
           </div>
           {limits ? <RateLimitSummary limits={limits} /> : null}
           <div className="mt-2 truncate text-[11px] text-slate-500">
             {current?.thread_name || current?.id || "Codex session"} ·{" "}
-            {usage.scanned_sessions}개 로컬 세션 스캔
+            Scanned {usage.scanned_sessions} local session{usage.scanned_sessions === 1 ? "" : "s"}
           </div>
         </>
       ) : (
         <div className="text-[12px] text-slate-500">
-          로컬 Codex 사용량을 아직 찾지 못했습니다.
+          No local Codex usage found yet.
           {usage?.warnings?.[0] ? ` ${usage.warnings[0]}` : ""}
         </div>
       )}
@@ -636,7 +636,7 @@ function RateLimitSummary({ limits }: { limits: CodexRateLimits }) {
     <div className="mt-2 rounded border border-slate-800 bg-slate-950/45 p-2.5">
       <div className="mb-2 flex items-center justify-between gap-2">
         <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-          Codex 제한
+          Codex limits
         </div>
         {limits.plan_type ? (
           <div className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-300">
@@ -712,21 +712,21 @@ function SessionPanel({
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-slate-900/70">
       <div className="shrink-0 border-b border-slate-800 px-3 py-2">
         <div className="text-[12px] font-semibold uppercase tracking-wider text-slate-400">
-          Markdown 작업
+          Markdown tasks
         </div>
         {summary ? (
           <div className="mt-2 grid grid-cols-2 gap-2 text-[11px] text-slate-300">
-            <MiniStat label="그룹" value={session?.groups.length ?? 0} />
+            <MiniStat label="Groups" value={session?.groups.length ?? 0} />
             <MiniStat label="Markdown" value={stats.markdownRuns} />
-            <MiniStat label="반영" value={reviewLoopText} />
-            <MiniStat label="파일" value={stats.changedFiles} />
+            <MiniStat label="Fixes" value={reviewLoopText} />
+            <MiniStat label="Files" value={stats.changedFiles} />
           </div>
         ) : null}
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto p-2">
         {!session || session.groups.length === 0 ? (
           <div className="px-2 py-8 text-center text-[12px] text-slate-500">
-            워크플로우 이벤트 대기 중
+            Waiting for workflow events
           </div>
         ) : (
           <div className="space-y-2">
@@ -734,7 +734,7 @@ function SessionPanel({
               <button
                 key={group.id}
                 onClick={() => onSelectGroup(group.id)}
-                title="중앙 flow에서 이 그룹 보기"
+                title="Show this group in the main flow"
                 className={`w-full rounded-md border px-3 py-2 text-left transition ${
                   group.id === activeGroupId
                     ? "border-cyan-500 bg-cyan-950/35"
@@ -744,22 +744,22 @@ function SessionPanel({
                 <div className="flex items-center justify-between gap-2">
                   <div className="min-w-0">
                     <div className="truncate text-[12px] font-semibold text-slate-100">
-                      그룹 {group.sequence ?? ""} · {group.name}
+                      Group {group.sequence ?? ""} · {group.name}
                     </div>
                   </div>
                   <span className="shrink-0 rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-300">
-                    {group.phase_label ?? "구현"}
+                    {group.phase_label ?? "Implementation"}
                   </span>
                 </div>
                 <div className="mt-1 line-clamp-2 text-[11px] leading-snug text-slate-400">
                   {group.summary?.implementation?.[0] ||
                     group.summary?.review?.[0] ||
                     group.user_prompt ||
-                    "사용자 질의 없음"}
+                    "No user prompt"}
                 </div>
                 <div className="mt-1 flex items-center gap-2 text-[10px] text-slate-500">
-                  <span>{group.summary?.file_count ?? 0}개 파일</span>
-                  {group.workflow_runs?.length ? <span>{group.workflow_runs.length}개 루프</span> : null}
+                  <span>{group.summary?.file_count ?? 0} file{group.summary?.file_count === 1 ? "" : "s"}</span>
+                  {group.workflow_runs?.length ? <span>{group.workflow_runs.length} loop{group.workflow_runs.length === 1 ? "" : "s"}</span> : null}
                   <span className="text-emerald-300">+{group.summary?.added_lines ?? 0}</span>
                   <span className="text-rose-300">-{group.summary?.removed_lines ?? 0}</span>
                 </div>
@@ -893,13 +893,13 @@ function fallbackStepSummary(group: ChangeGroup, kind: MarkdownWorkflowStepKind)
     return (
       group.summary?.review?.[0] ||
       group.summary?.implementation?.[0] ||
-      "이 단계의 리뷰나 검증 내용이 아직 기록되지 않았습니다."
+      "No review or verification details have been recorded for this step yet."
     );
   }
   return (
     group.summary?.implementation?.[0] ||
     group.summary?.review?.[0] ||
-    "이 단계의 구현 내용이 아직 기록되지 않았습니다."
+    "No implementation details have been recorded for this step yet."
   );
 }
 
@@ -947,38 +947,38 @@ function stepIcon(kind: MarkdownWorkflowStepKind): LucideIcon {
 }
 
 function stepKindLabel(kind: MarkdownWorkflowStepKind): string {
-  if (kind === "preflight") return "사전 확인";
+  if (kind === "preflight") return "Preflight";
   if (kind === "markdown") return "Markdown";
-  if (kind === "branch") return "브랜치";
-  if (kind === "implementation") return "구현";
-  if (kind === "review") return "리뷰";
-  if (kind === "review_fix") return "리뷰 반영";
-  if (kind === "verification") return "검증";
-  if (kind === "commit") return "커밋";
-  if (kind === "push") return "푸시";
-  if (kind === "merge") return "병합";
+  if (kind === "branch") return "Branch";
+  if (kind === "implementation") return "Implementation";
+  if (kind === "review") return "Review";
+  if (kind === "review_fix") return "Review fix";
+  if (kind === "verification") return "Verification";
+  if (kind === "commit") return "Commit";
+  if (kind === "push") return "Push";
+  if (kind === "merge") return "Merge";
   return kind;
 }
 
 function workflowSkillLabel(skill: string, label?: string): string {
   const cleaned = label?.trim() || skill.trim();
   const known: Record<string, string> = {
-    "markdown-branch-push": "Markdown 브랜치 푸시",
-    "markdown-branch-commit": "Markdown 브랜치 커밋",
-    "captured-turn": "캡처된 턴",
-    "Markdown Branch Push": "Markdown 브랜치 푸시",
-    "Markdown Branch Commit": "Markdown 브랜치 커밋",
-    "Captured turn": "캡처된 턴",
+    "markdown-branch-push": "Markdown Branch Push",
+    "markdown-branch-commit": "Markdown Branch Commit",
+    "captured-turn": "Captured turn",
+    "Markdown Branch Push": "Markdown Branch Push",
+    "Markdown Branch Commit": "Markdown Branch Commit",
+    "Captured turn": "Captured turn",
   };
   return known[cleaned] ?? known[skill] ?? cleaned;
 }
 
 function statusLabel(status: MarkdownWorkflowStepStatus): string {
-  if (status === "completed") return "완료";
-  if (status === "skipped") return "건너뜀";
-  if (status === "blocked") return "차단";
-  if (status === "pending") return "대기";
-  return "미확인";
+  if (status === "completed") return "Completed";
+  if (status === "skipped") return "Skipped";
+  if (status === "blocked") return "Blocked";
+  if (status === "pending") return "Pending";
+  return "Unknown";
 }
 
 function statusRailClass(status: MarkdownWorkflowStepStatus): string {
@@ -990,9 +990,9 @@ function statusRailClass(status: MarkdownWorkflowStepStatus): string {
 }
 
 function runStatusLabel(status: MarkdownWorkflowRun["status"]): string {
-  if (status === "completed") return "완료";
-  if (status === "blocked") return "차단";
-  return "진행";
+  if (status === "completed") return "Completed";
+  if (status === "blocked") return "Blocked";
+  return "In progress";
 }
 
 function runStatusClass(status: MarkdownWorkflowRun["status"]): string {
@@ -1002,11 +1002,11 @@ function runStatusClass(status: MarkdownWorkflowRun["status"]): string {
 }
 
 function phaseLabel(phase: ChangeGroup["phase"]): string {
-  if (phase === "review") return "리뷰";
-  if (phase === "review_fix") return "리뷰 반영";
-  if (phase === "verification") return "검증";
-  if (phase === "planning") return "정리";
-  return "구현";
+  if (phase === "review") return "Review";
+  if (phase === "review_fix") return "Review fix";
+  if (phase === "verification") return "Verification";
+  if (phase === "planning") return "Planning";
+  return "Implementation";
 }
 
 function latestGroup(session: ChangeSessionResponse | null): ChangeGroup | null {
@@ -1018,7 +1018,7 @@ function errorMessage(err: unknown): string {
   return (
     (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ??
     (err as Error)?.message ??
-    "알 수 없는 오류"
+    "Unknown error"
   );
 }
 
@@ -1038,7 +1038,7 @@ function formatTokens(value: number): string {
 }
 
 function usageDetail(usage: CodexUsageResponse["all_time"]): string {
-  return `입력 ${formatTokens(usage.input_tokens)} · 출력 ${formatTokens(usage.output_tokens)} · 추론 ${formatTokens(usage.reasoning_output_tokens)}`;
+  return `Input ${formatTokens(usage.input_tokens)} · Output ${formatTokens(usage.output_tokens)} · Reasoning ${formatTokens(usage.reasoning_output_tokens)}`;
 }
 
 function formatLimitInline(limits: CodexRateLimits): string {
@@ -1054,15 +1054,15 @@ function formatPercent(value: number | null | undefined): string {
 
 function formatWindow(minutes: number | null | undefined): string {
   if (!minutes) return "window";
-  if (minutes % 10080 === 0) return `${minutes / 10080}주`;
-  if (minutes % 1440 === 0) return `${minutes / 1440}일`;
-  if (minutes % 60 === 0) return `${minutes / 60}시간`;
-  return `${minutes}분`;
+  if (minutes % 10080 === 0) return `${minutes / 10080}w`;
+  if (minutes % 1440 === 0) return `${minutes / 1440}d`;
+  if (minutes % 60 === 0) return `${minutes / 60}h`;
+  return `${minutes}m`;
 }
 
 function formatReset(epochSeconds: number | null | undefined): string {
   if (!epochSeconds) return "-";
-  return new Date(epochSeconds * 1000).toLocaleString("ko-KR", {
+  return new Date(epochSeconds * 1000).toLocaleString("en-US", {
     month: "numeric",
     day: "numeric",
     hour: "2-digit",

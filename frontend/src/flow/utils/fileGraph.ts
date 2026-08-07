@@ -129,16 +129,16 @@ function aggregateEdgeSummary(edges: ChangeEdge[], sourceFile: string, targetFil
   const summaries = unique(edges.map((edge) => edge.summary).filter(Boolean));
   if (summaries.length === 0) return `${sourceFile} → ${targetFile}`;
   if (summaries.length === 1) return summaries[0];
-  return `${summaries[0]} 외 ${summaries.length - 1}개 관계`;
+  return `${summaries[0]} and ${summaries.length - 1} more relationship${summaries.length === 2 ? "" : "s"}`;
 }
 
 function aggregateEdgeBody(edges: ChangeEdge[], sourceFile: string, targetFile: string): string {
   const bodies = unique(edges.map((edge) => edge.body?.trim()).filter(Boolean));
   if (bodies.length > 0) return bodies.join("\n\n---\n\n").slice(0, 18_000);
   return [
-    `- **출발 파일**: \`${sourceFile}\``,
-    `- **도착 파일**: \`${targetFile}\``,
-    `- **관계**: ${unique(edges.map((edge) => edge.kind)).join(", ")}`,
+    `- **Source file**: \`${sourceFile}\``,
+    `- **Target file**: \`${targetFile}\``,
+    `- **Relationship**: ${unique(edges.map((edge) => edge.kind)).join(", ")}`,
   ].join("\n");
 }
 

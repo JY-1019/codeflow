@@ -182,7 +182,7 @@ interface WorkflowStepDisplayData extends MarkdownWorkflowStep {
 function visualStepRowsForGroup(group: ChangeGroup): VisualStepRow[] {
   const rows = (group.workflow_runs ?? [])
     .map((run, index) => {
-      const title = run.markdown_title || run.markdown_path || run.command_label || `루프 ${index + 1}`;
+      const title = run.markdown_title || run.markdown_path || run.command_label || `Loop ${index + 1}`;
       const steps = run.steps
         .filter((step) => FLOW_STEP_KINDS.has(step.kind))
         .map((step) => ({
@@ -216,14 +216,14 @@ function visualStepRowsForGroup(group: ChangeGroup): VisualStepRow[] {
         status: "completed",
         files: group.summary?.changed_files ?? [],
         runTitle: group.name,
-        skillLabel: "캡처된 턴",
+        skillLabel: "Captured turn",
       },
     ],
     title: group.name,
     run: {
       id: group.id,
       skill: "captured-turn",
-      skill_label: "캡처된 턴",
+      skill_label: "Captured turn",
       command_label: group.name,
       markdown_path: "",
       markdown_title: group.name,
@@ -240,13 +240,13 @@ function fallbackStepSummary(group: ChangeGroup, kind: string): string {
     return (
       group.summary?.review?.[0] ||
       group.summary?.implementation?.[0] ||
-      "이 그룹의 리뷰나 검증 내용이 아직 없습니다."
+      "No review or verification details have been recorded for this group yet."
     );
   }
   return (
     group.summary?.implementation?.[0] ||
     group.summary?.review?.[0] ||
-    "이 그룹의 구현이나 리뷰 내용이 아직 없습니다."
+    "No implementation or review details have been recorded for this group yet."
   );
 }
 
@@ -434,15 +434,15 @@ function SessionFlowInner({
         />
       </ReactFlow>
       <div className="absolute bottom-3 left-3 z-10 rounded-md border border-slate-700/70 bg-slate-900/85 px-2 py-1.5 text-[10px] shadow-lg backdrop-blur">
-        <div className="mb-1 uppercase tracking-wider text-slate-500">흐름 단위</div>
+        <div className="mb-1 uppercase tracking-wider text-slate-500">Flow steps</div>
         <div className="flex flex-wrap gap-x-3 gap-y-1">
-          <LegendDot color="#38bdf8" label="명령/브랜치" />
-          <LegendDot color="#22d3ee" label="구현" />
-          <LegendDot color="#f59e0b" label="리뷰" />
-          <LegendDot color="#8b5cf6" label="리뷰 반영" />
-          <LegendDot color="#22c55e" label="검증" />
-          <LegendDot color="#6366f1" label="커밋" />
-          <LegendDot color="#84cc16" label="푸시/병합" />
+          <LegendDot color="#38bdf8" label="Command/branch" />
+          <LegendDot color="#22d3ee" label="Implementation" />
+          <LegendDot color="#f59e0b" label="Review" />
+          <LegendDot color="#8b5cf6" label="Review fix" />
+          <LegendDot color="#22c55e" label="Verification" />
+          <LegendDot color="#6366f1" label="Commit" />
+          <LegendDot color="#84cc16" label="Push/merge" />
         </div>
       </div>
     </div>
@@ -462,9 +462,9 @@ function EmptySession() {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-slate-400">
       <GitBranch className="h-8 w-8 text-slate-600" />
-      <div className="text-[13px]">아직 기록된 flow가 없습니다.</div>
+      <div className="text-[13px]">No flow has been recorded yet.</div>
       <div className="max-w-md text-[12px] text-slate-500">
-        Codex 또는 Claude skill이 워크플로우 이벤트를 보내면 구현/리뷰 단위가 자동으로 채워집니다.
+        Implementation and review steps appear automatically when a Codex or Claude skill sends workflow events.
       </div>
     </div>
   );
@@ -473,24 +473,24 @@ function EmptySession() {
 function workflowSkillLabel(skill: string, label?: string): string {
   const cleaned = label?.trim() || skill.trim();
   const known: Record<string, string> = {
-    "markdown-branch-push": "Markdown 브랜치 푸시",
-    "markdown-branch-commit": "Markdown 브랜치 커밋",
-    "captured-turn": "캡처된 턴",
-    "codeflow": "Codeflow 작업 기록",
-    general: "일반 작업 기록",
-    "Markdown Branch Push": "Markdown 브랜치 푸시",
-    "Markdown Branch Commit": "Markdown 브랜치 커밋",
-    "Captured turn": "캡처된 턴",
+    "markdown-branch-push": "Markdown Branch Push",
+    "markdown-branch-commit": "Markdown Branch Commit",
+    "captured-turn": "Captured turn",
+    "codeflow": "Codeflow capture",
+    general: "General capture",
+    "Markdown Branch Push": "Markdown Branch Push",
+    "Markdown Branch Commit": "Markdown Branch Commit",
+    "Captured turn": "Captured turn",
   };
   return known[cleaned] ?? known[skill] ?? cleaned;
 }
 
 function phaseLabel(phase: ChangeGroupPhase): string {
-  if (phase === "review") return "리뷰";
-  if (phase === "review_fix") return "리뷰 반영";
-  if (phase === "verification") return "검증";
-  if (phase === "planning") return "정리";
-  return "구현";
+  if (phase === "review") return "Review";
+  if (phase === "review_fix") return "Review fix";
+  if (phase === "verification") return "Verification";
+  if (phase === "planning") return "Planning";
+  return "Implementation";
 }
 
 function phaseNodeColor(phase: ChangeGroupPhase | undefined): string {

@@ -40,6 +40,13 @@ def clean_captured_text(text: str, max_chars: int = MAX_CAPTURE_TEXT_CHARS) -> s
     if not text:
         return ""
 
+    text = text.replace(
+        "_Codeflow가 Codex 내부 경고와 긴 도구 출력을 생략했습니다._",
+        "_Codeflow omitted Codex runtime warnings and long tool output._",
+    ).replace(
+        "_Codeflow가 긴 Codex 리뷰 출력의 나머지를 생략했습니다._",
+        "_Codeflow omitted the rest of the long Codex review output._",
+    )
     lines = text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
     cleaned: list[str] = []
     skipping_tool_output = False
@@ -100,7 +107,7 @@ def clean_captured_text(text: str, max_chars: int = MAX_CAPTURE_TEXT_CHARS) -> s
     if result:
         return result
     if omitted_noise:
-        return "_Codeflow가 Codex 내부 경고와 긴 도구 출력을 생략했습니다._"
+        return "_Codeflow omitted Codex runtime warnings and long tool output._"
     return ""
 
 
@@ -160,4 +167,4 @@ def _trim_blank_edges(text: str) -> str:
 
 
 def _truncation_notice() -> str:
-    return "\n\n_Codeflow가 긴 Codex 리뷰 출력의 나머지를 생략했습니다._"
+    return "\n\n_Codeflow omitted the rest of the long Codex review output._"

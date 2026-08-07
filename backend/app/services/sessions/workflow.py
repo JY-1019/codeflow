@@ -9,8 +9,8 @@ MAX_WORKFLOW_RUNS = 12
 MAX_MARKDOWN_CHARS = 12_000
 
 WORKFLOW_SKILL_LABELS: dict[str, str] = {
-    "markdown-branch-push": "Markdown 브랜치 푸시",
-    "markdown-branch-commit": "Markdown 브랜치 커밋",
+    "markdown-branch-push": "Markdown Branch Push",
+    "markdown-branch-commit": "Markdown Branch Commit",
 }
 
 
@@ -151,10 +151,10 @@ def _markdown_paths(text: str) -> list[str]:
 
 def _fallback_markdown_unit(prompt: str) -> dict[str, str]:
     content = _without_skill_reference_blocks(prompt).strip() or prompt.strip()
-    title = _markdown_title(content) if content else "현재 요청"
+    title = _markdown_title(content) if content else "Current request"
     return {
         "path": "",
-        "title": title or "현재 요청",
+        "title": title or "Current request",
         "content": content,
     }
 
@@ -188,28 +188,28 @@ def _workflow_steps(
     steps = [
         _step(
             "preflight",
-            "사전 확인",
-            "저장소 상태, 기준 브랜치, 리뷰 명령 가능 여부를 확인합니다.",
+            "Preflight",
+            "Checks repository status, the base branch, and review command availability.",
             _status_by_keywords(outcome_text, ["git status", "preflight", "remote", "branch"], default="unknown"),
             detail=_lines_near_keywords(outcome_text, ["git status", "preflight", "remote", "branch"]),
         ),
         _step(
             "markdown",
-            "Markdown 명령 해석",
-            "Markdown 파일 또는 현재 요청을 하나의 구현 단위로 읽습니다.",
+            "Parse Markdown command",
+            "Reads the Markdown file or current request as one implementation unit.",
             "completed",
             detail=markdown_content or markdown_path,
         ),
         _step(
             "branch",
-            "작업 브랜치 준비",
-            "Markdown 단위별 작업 브랜치를 기준 브랜치에서 준비합니다.",
+            "Prepare work branch",
+            "Prepares a work branch for each Markdown unit from the base branch.",
             _branch_step_status(outcome_text),
             detail=_lines_near_keywords(outcome_text, ["branch", "브랜치", "worktree"]),
         ),
         _step(
             "implementation",
-            "구현 작업",
+            "Implementation",
             _implementation_summary(outcome_text, changed_files),
             "completed" if changed_files or _has_any(outcome_text, ["구현", "implemented", "updated", "수정"]) else "unknown",
             detail=_lines_near_keywords(
@@ -220,7 +220,7 @@ def _workflow_steps(
         ),
         _step(
             "review",
-            "리뷰 실행",
+            "Run review",
             _review_summary(outcome_text),
             _review_status(outcome_text),
             detail=_lines_near_keywords(
@@ -240,7 +240,7 @@ def _workflow_steps(
         ),
         _step(
             "review_fix",
-            "리뷰 반영",
+            "Apply review fixes",
             _review_fix_summary(outcome_text),
             _review_fix_status(outcome_text),
             detail=_lines_near_keywords(
@@ -251,7 +251,7 @@ def _workflow_steps(
         ),
         _step(
             "verification",
-            "검증",
+            "Verification",
             _verification_summary(outcome_text),
             _verification_status(outcome_text),
             detail=_lines_near_keywords(
@@ -261,8 +261,8 @@ def _workflow_steps(
         ),
         _step(
             "commit",
-            "커밋",
-            "해당 Markdown 단위에 속한 파일만 커밋합니다.",
+            "Commit",
+            "Commits only files belonging to the current Markdown unit.",
             _commit_status(outcome_text),
             detail=_lines_near_keywords(outcome_text, ["commit", "committed", "커밋"]),
         ),
@@ -273,15 +273,15 @@ def _workflow_steps(
             [
                 _step(
                     "push",
-                    "브랜치 푸시",
-                    "파일 브랜치를 origin에 푸시합니다.",
+                    "Push branch",
+                    "Pushes the file branch to origin.",
                     _push_status(outcome_text),
                     detail=_lines_near_keywords(outcome_text, ["pushed", "branch push", "브랜치 push", "브랜치 푸시", "push"]),
                 ),
                 _step(
                     "merge",
-                    "main 병합/푸시",
-                    "파일 브랜치를 main에 통합하고 main을 푸시합니다.",
+                    "Merge/push main",
+                    "Integrates the file branch into main and pushes main.",
                     _merge_status(outcome_text),
                     detail=_lines_near_keywords(outcome_text, ["merged", "main push", "main-pushed", "main 병합", "merge", "병합"]),
                 ),
@@ -387,8 +387,9 @@ def _implementation_summary(text: str, changed_files: list[str]) -> str:
     if item:
         return item
     if changed_files:
-        return f"{len(changed_files)}개 파일을 변경했습니다."
-    return "구현 작업 내용을 아직 diff에서 찾지 못했습니다."
+        count = len(changed_files)
+        return f"Changed {count} file{'s' if count != 1 else ''}."
+    return "No implementation details have been found in the diff yet."
 
 
 def _review_summary(text: str) -> str:
@@ -406,17 +407,17 @@ def _review_summary(text: str) -> str:
             "review:",
         ],
     )
-    return item or "리뷰 명령을 실행해 정확성/설계 지적사항을 확인합니다."
+    return item or "Runs a review command to find correctness and design issues."
 
 
 def _review_fix_summary(text: str) -> str:
     item = _extract_line(text, ["반영", "fixed", "addressed", "수정 완료", "해결"])
-    return item or "리뷰 지적사항이 있으면 수정하고 다시 리뷰합니다."
+    return item or "Applies review findings, then runs review again."
 
 
 def _verification_summary(text: str) -> str:
     item = _extract_line(text, ["pytest", "typecheck", "npm run", "검증", "테스트", "test"])
-    return item or "리뷰 이후 필요한 좁은 검증을 실행합니다."
+    return item or "Runs focused verification after review."
 
 
 def _extract_line(text: str, keywords: list[str]) -> str:
@@ -490,7 +491,7 @@ def _branch_name(text: str) -> str:
 
 
 def _command_label(skill: str, unit: dict[str, str]) -> str:
-    title = unit.get("title") or unit.get("path") or "현재 요청"
+    title = unit.get("title") or unit.get("path") or "Current request"
     return f"{WORKFLOW_SKILL_LABELS.get(skill, skill)} · {title}"
 
 

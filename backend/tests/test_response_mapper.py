@@ -5,8 +5,8 @@ import subprocess
 from pathlib import Path
 
 from app.services.changes.git_diff import collect_diff
-from app.services.changes.graph_builder import build_graph
-from app.services.changes.response_mapper import attach_response, _split_paragraphs
+from app.services.changes.graph_builder import ChangeEdge, ChangeGraph, ChangeNode, build_graph
+from app.services.changes.response_mapper import attach_response, _propagate_edge_docs, _split_paragraphs
 
 
 def _git(args: list[str], cwd: Path) -> None:
@@ -29,6 +29,29 @@ def test_split_paragraphs_keeps_code_blocks():
     parts = _split_paragraphs(text)
     assert [p.is_code_block for p in parts] == [False, False, True, False]
     assert "def x()" in parts[2].text
+
+
+def test_edge_fallback_summaries_preserve_direction():
+    nodes = [
+        ChangeNode(id="source", kind="changed", label="old", file="old.py"),
+        ChangeNode(id="target", kind="changed", label="new", file="new.py"),
+    ]
+    expected = {
+        "referenced_by": "`old` uses `new`.",
+        "renamed_from": "`old` was renamed to `new`.",
+    }
+
+    for kind, summary in expected.items():
+        graph = ChangeGraph(
+            project_root="/tmp/repo",
+            source="working",
+            base_ref=None,
+            head_ref=None,
+            nodes=nodes,
+            edges=[ChangeEdge(id=kind, source="source", target="target", kind=kind, label=kind)],
+        )
+        _propagate_edge_docs(graph)
+        assert graph.edges[0].summary == summary
 
 
 def test_attach_response_links_paragraphs_to_matching_nodes(tmp_path: Path):

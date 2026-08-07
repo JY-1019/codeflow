@@ -39,10 +39,10 @@ def test_default_node_docs_describe_implementation_instead_of_line_counts():
     fill_default_docs(graph)
 
     body = graph.nodes[0].body
-    assert "1) [수정된 파일]" in body
-    assert "백엔드 기본 문서가 diff 라인을 분석해 구현 의도를 담은 fallback 설명을 만들도록 합니다." in body
-    assert "`_summarize_code_intent`: 추가/삭제 코드에서 await, React setter, import 같은 신호를 찾아 파일 단위 요약으로 바꿉니다." in body
-    assert "라인 수, 추상 분류, 임의 코드 예시를 앞세우던 설명 문구를 제거했습니다." in body
+    assert "1) [Modified file]" in body
+    assert "Makes the backend fallback documentation infer implementation intent from diff lines." in body
+    assert "`_summarize_code_intent`: Finds signals such as await, React setters, and imports in changed code for a file-level summary." in body
+    assert "Removes descriptions centered on line counts, abstract categories, and arbitrary code examples." in body
     assert "라인 변화: +2/-1" not in body
     assert "추가된 코드 예" not in body
     assert "```" not in body

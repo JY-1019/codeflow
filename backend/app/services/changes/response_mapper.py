@@ -230,7 +230,7 @@ def _attach_edge_response_docs(
             paragraph_used[idx] = True
 
         response_doc = "\n\n".join(texts)
-        addition = f"**AI 응답에서 연결된 설명:**\n\n{response_doc}"
+        addition = f"**Details mapped from the AI response:**\n\n{response_doc}"
         edge.body = (edge.body + "\n\n" + addition).strip() if edge.body else addition
 
 
@@ -248,14 +248,14 @@ def _propagate_edge_docs(graph: ChangeGraph) -> None:
         if edge.summary:
             continue
         verb = {
-            "contains": "포함합니다",
-            "calls": "참조/호출합니다",
-            "imports": "import합니다",
-            "referenced_by": "사용합니다",
-            "modifies": "수정합니다",
-            "renamed_from": "에서 이름이 바뀌었습니다",
-        }.get(edge.kind, "와 연결됩니다")
-        edge.summary = f"`{src.label}` 가 `{tgt.label}` 를 {verb}."
+            "contains": "contains",
+            "calls": "calls/references",
+            "imports": "imports",
+            "referenced_by": "uses",
+            "modifies": "modifies",
+            "renamed_from": "was renamed to",
+        }.get(edge.kind, "is connected to")
+        edge.summary = f"`{src.label}` {verb} `{tgt.label}`."
         if not edge.body and (src.summary or tgt.summary):
             parts: list[str] = []
             if src.summary:

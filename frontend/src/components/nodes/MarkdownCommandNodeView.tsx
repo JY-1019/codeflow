@@ -10,8 +10,8 @@ export interface MarkdownCommandNodeData extends MarkdownWorkflowRun {
 
 export const MarkdownCommandNodeView = memo(({ data, selected }: NodeProps) => {
   const run = data as unknown as MarkdownCommandNodeData;
-  const title = run.markdown_title || run.markdown_path || "현재 요청";
-  const markdownPreview = firstContentLine(run.markdown_content) || run.markdown_path || "Markdown 원문 대기";
+  const title = run.markdown_title || run.markdown_path || "Current request";
+  const markdownPreview = firstContentLine(run.markdown_content) || run.markdown_path || "Waiting for Markdown source";
 
   return (
     <div
@@ -31,7 +31,7 @@ export const MarkdownCommandNodeView = memo(({ data, selected }: NodeProps) => {
             {workflowSkillLabel(run.skill, run.skill_label)}
           </span>
           <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-slate-300">
-            {run.status === "completed" ? "완료" : run.status === "blocked" ? "차단" : "진행"}
+            {run.status === "completed" ? "Completed" : run.status === "blocked" ? "Blocked" : "In progress"}
           </span>
         </div>
         <div className="mt-2 line-clamp-2 text-[13px] font-semibold leading-snug text-slate-100">
@@ -48,7 +48,7 @@ export const MarkdownCommandNodeView = memo(({ data, selected }: NodeProps) => {
         <div className="flex items-center justify-between gap-2">
           <span className="inline-flex items-center gap-1.5 text-slate-400">
             <BookOpenText className="h-3.5 w-3.5 text-sky-300" />
-            {run.steps?.length ?? 0}단계
+            {run.steps?.length ?? 0} step{run.steps?.length === 1 ? "" : "s"}
           </span>
           {run.branch_name ? (
             <span className="inline-flex min-w-0 items-center gap-1.5 text-slate-400">
@@ -81,12 +81,12 @@ function firstContentLine(content: string): string {
 function workflowSkillLabel(skill: string, label?: string): string {
   const cleaned = label?.trim() || skill.trim();
   const known: Record<string, string> = {
-    "markdown-branch-push": "Markdown 브랜치 푸시",
-    "markdown-branch-commit": "Markdown 브랜치 커밋",
-    "captured-turn": "캡처된 턴",
-    "Markdown Branch Push": "Markdown 브랜치 푸시",
-    "Markdown Branch Commit": "Markdown 브랜치 커밋",
-    "Captured turn": "캡처된 턴",
+    "markdown-branch-push": "Markdown Branch Push",
+    "markdown-branch-commit": "Markdown Branch Commit",
+    "captured-turn": "Captured turn",
+    "Markdown Branch Push": "Markdown Branch Push",
+    "Markdown Branch Commit": "Markdown Branch Commit",
+    "Captured turn": "Captured turn",
   };
   return known[cleaned] ?? known[skill] ?? cleaned;
 }

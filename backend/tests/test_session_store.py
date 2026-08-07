@@ -519,7 +519,7 @@ def test_general_capture_skill_label_is_localized(tmp_path, monkeypatch):
     )
 
     run = result["groups"][0]["workflow_runs"][0]
-    assert run["skill_label"] == "일반 작업 기록"
+    assert run["skill_label"] == "General capture"
 
 
 def test_general_capture_completes_on_verification(tmp_path, monkeypatch):

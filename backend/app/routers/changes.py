@@ -39,7 +39,7 @@ _LATEST_RESULTS: dict[str, dict] = {}
 class ChangesRequest(BaseModel):
     project_root: Optional[str] = Field(
         default=None,
-        description="git 저장소 경로. 비우면 환경변수 CODEFLOW_PROJECT_ROOT 또는 서버 CWD 사용.",
+        description="Git repository path. Defaults to CODEFLOW_PROJECT_ROOT or the server working directory.",
     )
     source: str = Field(default="working", description="working | staged | range | branch")
     base_ref: Optional[str] = None
@@ -47,8 +47,8 @@ class ChangesRequest(BaseModel):
     assistant_response: str = Field(
         default="",
         description=(
-            "Codex / Claude Code가 만든 응답 텍스트(설명/요약). 비워두면 각 노드/엣지는 "
-            "diff에서 자동 생성된 기본 doc만 갖습니다."
+            "Response text produced by Codex or Claude Code. When empty, each node and edge "
+            "uses only documentation generated from the diff."
         ),
     )
 
@@ -56,45 +56,45 @@ class ChangesRequest(BaseModel):
 class SessionCaptureRequest(ChangesRequest):
     user_prompt: str = Field(
         default="",
-        description="사용자의 원 질의. 세션 타임라인에서 group docs로 표시됩니다.",
+        description="Original user prompt, displayed in group documentation on the session timeline.",
     )
     session_id: Optional[str] = Field(
         default=None,
-        description="같은 Codex/Claude 대화의 group들을 묶는 식별자. 비우면 repo+branch 기준.",
+        description="Identifier grouping events from the same Codex or Claude conversation. Defaults to repository and branch.",
     )
 
 
 class SessionWorkflowEventRequest(SessionCaptureRequest):
     workflow_id: str = Field(
         default="",
-        description="한 Markdown review-loop 명령을 묶는 안정적인 id입니다.",
+        description="Stable ID for one Markdown review-loop command.",
     )
     run_id: str = Field(
         default="",
-        description="같은 workflow 안에서 Markdown 파일 하나를 나타내는 id입니다.",
+        description="ID for one Markdown file within a workflow.",
     )
-    skill: str = Field(default="", description="markdown-branch-push 또는 markdown-branch-commit")
-    skill_label: str = Field(default="", description="UI에 표시할 skill 이름")
-    command_label: str = Field(default="", description="UI에 표시할 Markdown 명령/run 이름")
-    markdown_path: str = Field(default="", description="구현 단위 Markdown 파일 경로")
-    markdown_title: str = Field(default="", description="구현 단위 Markdown 제목")
-    markdown_content: str = Field(default="", description="구현 단위 Markdown 전문")
-    branch_name: str = Field(default="", description="해당 Markdown 단위 작업 브랜치")
-    step_id: str = Field(default="", description="같은 step을 갱신하고 싶을 때 쓰는 안정적인 id")
+    skill: str = Field(default="", description="markdown-branch-push or markdown-branch-commit")
+    skill_label: str = Field(default="", description="Skill name displayed in the UI")
+    command_label: str = Field(default="", description="Markdown command or run name displayed in the UI")
+    markdown_path: str = Field(default="", description="Path to the Markdown implementation unit")
+    markdown_title: str = Field(default="", description="Title of the Markdown implementation unit")
+    markdown_content: str = Field(default="", description="Full Markdown implementation unit content")
+    branch_name: str = Field(default="", description="Work branch for the Markdown implementation unit")
+    step_id: str = Field(default="", description="Stable ID used to update the same step")
     step_kind: str = Field(
         default="implementation",
         description="preflight | markdown | branch | implementation | review | review_fix | verification | commit | push | merge",
     )
-    step_label: str = Field(default="", description="노드 제목")
-    step_summary: str = Field(default="", description="노드 상단에 표시할 요약")
-    step_detail: str = Field(default="", description="노드 상세 패널에 표시할 설명")
+    step_label: str = Field(default="", description="Node title")
+    step_summary: str = Field(default="", description="Summary displayed at the top of the node")
+    step_detail: str = Field(default="", description="Description displayed in the node details panel")
     step_status: str = Field(default="completed", description="completed | skipped | pending | blocked | unknown")
     agent: str = Field(
         default="",
-        description="이 step을 수행한 도구/에이전트. 예: claude-code, codex. 구현과 리뷰 주체가 다를 때 구분합니다.",
+        description="Tool or agent that performed the step, such as claude-code or codex. Distinguishes implementation and review actors.",
     )
-    agent_label: str = Field(default="", description="UI에 표시할 수행 주체 이름")
-    files: list[str] = Field(default_factory=list, description="이 step과 직접 연결할 파일 목록")
+    agent_label: str = Field(default="", description="Agent name displayed in the UI")
+    files: list[str] = Field(default_factory=list, description="Files directly associated with the step")
 
 
 def _resolve_project_root(raw: Optional[str]) -> str:
