@@ -1,0 +1,21 @@
+{
+  "name": "codeflow",
+  "owner": {
+    "name": "Codeflow",
+    "url": "https://github.com/JY-1019/codeflow"
+  },
+  "description": "Codeflow plugins for local implementation and review visualization.",
+  "plugins": [
+    {
+      "name": "codeflow",
+      "source": "./",
+      "description": "Capture Claude Code and Codex implementation/review loops into the local Codeflow desktop app.",
+      "category": "productivity",
+      "tags": [
+        "codeflow",
+        "review",
+        "visualization"
+      ]
+    }
+  ]
+}

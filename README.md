@@ -11,18 +11,28 @@ The plugin does not download or install the desktop app for you. Install it firs
 
 ## Quick Start
 
-Codeflow needs both the desktop app and this repository's adapter. Complete
-these steps once, then invoke Codeflow from any coding task you want to record.
+Codeflow needs the desktop app, Python 3.10 or newer, and an adapter for Codex
+or Claude Code. You do not need to clone this repository.
 
-### 1. Clone The Adapter
+### 1. Check Python
+
+The capture adapter uses Python's standard library only; no `pip install` is
+needed. The packaged desktop app already includes its backend executable.
+
+macOS:
 
 ```bash
-git clone https://github.com/JY-1019/codeflow.git
-cd codeflow
+python3 --version
 ```
 
-Keep this checkout after setup. Run the remaining repository commands from this
-directory.
+Windows PowerShell (either command is fine):
+
+```powershell
+python --version
+py -3 --version
+```
+
+Install Python 3.10 or newer before continuing if neither command works.
 
 ### 2. Install The Desktop App
 
@@ -53,41 +63,40 @@ setx CODEFLOW_APP_EXECUTABLE "$codeflowDir\Codeflow-0.1.0-x64.exe"
 Start-Process $env:CODEFLOW_APP_EXECUTABLE
 ```
 
-### 3. Connect Codex
+### 3. Install The Adapter
 
-On macOS, link the bundled Skill into your local Codex skills directory:
+Choose Codex, Claude Code, or install both.
+
+#### Codex
+
+Paste this into a Codex task:
+
+```text
+$skill-installer install https://github.com/JY-1019/codeflow/tree/main/skill as codeflow
+```
+
+Start a new Codex task after installation, then invoke `$codeflow` or include
+`codeflow` in the request.
+
+#### Claude Code
+
+Run this once in a shell:
 
 ```bash
-mkdir -p ~/.codex/skills
-ln -sfn "$PWD/skill" ~/.codex/skills/codeflow
+claude plugin marketplace add JY-1019/codeflow --sparse .claude-plugin skills skill bin && claude plugin install codeflow@codeflow
 ```
 
-On Windows, create a directory junction from PowerShell:
+Start a new Claude Code session after installation, then invoke
+`/codeflow:codeflow` or include `codeflow` in the request.
 
-```powershell
-New-Item -ItemType Directory -Force "$env:USERPROFILE\.codex\skills"
-New-Item -ItemType Junction `
-  -Path "$env:USERPROFILE\.codex\skills\codeflow" `
-  -Target (Resolve-Path ".\skill")
-```
+Because this repository is private, both installers need access to it. Sign in
+to GitHub first or provide the Git credentials/token used by Codex or Claude
+Code.
 
-Start a new Codex task, then invoke `$codeflow` or include `codeflow` in the
-request.
+### 4. Verify The Setup
 
-### 4. Connect Claude Code
-
-Launch Claude Code with the repository loaded as a local plugin:
-
-```bash
-claude --plugin-dir "$PWD"
-```
-
-Pass the same `--plugin-dir` option each time you start Claude Code.
-
-### 5. Verify The Setup
-
-Keep the desktop app running, start a new Codex task or the Claude Code session
-from step 4, and send:
+Keep the desktop app running, start a new Codex task or Claude Code session, and
+send:
 
 ```text
 Open Codeflow and record this test task.
@@ -103,6 +112,7 @@ This repository root is also the plugin root.
 
 - Codex manifest: `.codex-plugin/plugin.json`
 - Claude Code manifest: `.claude-plugin/plugin.json`
+- Claude Code marketplace: `.claude-plugin/marketplace.json`
 - Plugin skill wrapper: `skills/codeflow/SKILL.md`
 - Canonical skill instructions: `skill/SKILL.md`
 - Plugin PATH wrappers: `bin/codeflow`, `bin/codeflow-capture`
@@ -158,13 +168,19 @@ user prompt
   -> Electron Session Flow UI
 ```
 
-The capture script prefers the plugin PATH wrapper first, then falls back to legacy Skill installation paths:
+The capture script prefers the plugin PATH wrapper first, then falls back to
+standalone Skill installation paths:
 
 ```bash
-SCRIPT="$(command -v codeflow-capture || true)"
-[ -n "$SCRIPT" ] || SCRIPT="$HOME/.codex/skills/codeflow/scripts/codeflow_capture.py"
-[ -f "$SCRIPT" ] || SCRIPT="$HOME/.claude/skills/codeflow/scripts/codeflow_capture.py"
+CAPTURE="$(command -v codeflow-capture || true)"
+[ -n "$CAPTURE" ] || CAPTURE="$HOME/.codex/skills/codeflow/scripts/codeflow_capture.py"
+[ -f "$CAPTURE" ] || CAPTURE="$HOME/.claude/skills/codeflow/scripts/codeflow_capture.py"
 ```
+
+The Claude plugin's `codeflow-capture` wrapper selects `python3`, `python`, or
+the Windows `py -3` launcher. A standalone Codex Skill invokes its installed
+`.py` script with the available Python 3.10+ command. Neither path installs
+Python packages or depends on executable bits preserved by a GitHub ZIP.
 
 The launcher prefers the installed packaged app:
 
@@ -265,13 +281,13 @@ Low-level diff analysis API. Supported `source` values are `working`, `staged`, 
 ```text
 codeflow/
 ├── .codex-plugin/plugin.json      # Codex plugin manifest
-├── .claude-plugin/plugin.json     # Claude Code plugin manifest
+├── .claude-plugin/                # Claude Code manifest + marketplace
 ├── bin/                           # plugin PATH wrappers
 ├── backend/                       # FastAPI, no external LLM calls
 ├── frontend/                      # Electron + Vite + React + @xyflow/react
 ├── prompts/                       # portable prompt examples
 ├── skill/                         # canonical Skill instructions + launcher
-└── skills/codeflow/         # plugin Skill wrapper
+└── skills/codeflow/               # plugin Skill wrapper
 ```
 
 ## Validation

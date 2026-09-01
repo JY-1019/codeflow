@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import sys
 from pathlib import Path
 
 
@@ -60,3 +61,22 @@ def test_shared_codeflow_session_id_overrides_each_host_session(monkeypatch):
     monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", "claude-thread")
 
     assert capture.default_capture_session_id("", {}) == "shared-handoff"
+
+
+def test_repo_root_is_optional_for_installed_skill(monkeypatch, tmp_path):
+    capture = _capture_module()
+    installed_script = tmp_path / "skills" / "codeflow" / "scripts" / "codeflow_capture.py"
+    installed_script.parent.mkdir(parents=True)
+    installed_script.touch()
+    monkeypatch.setattr(capture, "__file__", str(installed_script))
+    monkeypatch.chdir(tmp_path)
+
+    assert capture.repo_root() is None
+
+
+def test_python_launcher_uses_current_interpreter(tmp_path):
+    capture = _capture_module()
+    launcher = tmp_path / "codeflow"
+    launcher.write_text("#!/usr/bin/env python3\n", encoding="utf-8")
+
+    assert capture.executable_command(launcher) == [sys.executable, str(launcher)]

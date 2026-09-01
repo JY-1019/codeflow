@@ -18,7 +18,7 @@ API_BASE = "http://127.0.0.1:8019/api"
 DEFAULT_CAPTURE_TIMEOUT = 30.0
 
 
-def repo_root() -> Path:
+def repo_root() -> Path | None:
     configured = os.environ.get("CODEFLOW_APP_ROOT", "").strip()
     if configured:
         return Path(configured).expanduser().resolve()
@@ -33,9 +33,7 @@ def repo_root() -> Path:
     if (legacy / "frontend" / "package.json").exists():
         return legacy
 
-    raise RuntimeError(
-        "Could not find Codeflow app root. Set CODEFLOW_APP_ROOT to the repository path."
-    )
+    return None
 
 
 def codeflow_executable() -> Path:
@@ -47,10 +45,10 @@ def codeflow_executable() -> Path:
         raise RuntimeError(f"CODEFLOW_EXECUTABLE does not exist: {path}")
 
     script_path = Path(__file__).resolve()
-    candidates = [
-        script_path.parents[1] / "bin" / "codeflow",
-        repo_root() / "skill" / "bin" / "codeflow",
-    ]
+    candidates = [script_path.parents[1] / "bin" / "codeflow"]
+    root = repo_root()
+    if root:
+        candidates.append(root / "skill" / "bin" / "codeflow")
     for candidate in candidates:
         if candidate.exists():
             return candidate.resolve()
@@ -63,6 +61,16 @@ def codeflow_executable() -> Path:
         "Could not find the Codeflow executable. Set CODEFLOW_EXECUTABLE "
         "or use the bundled skill/bin/codeflow file."
     )
+
+
+def executable_command(executable: Path) -> list[str]:
+    try:
+        first_line = executable.open("rb").readline(128).lower()
+    except OSError:
+        first_line = b""
+    if first_line.startswith(b"#!") and b"python" in first_line:
+        return [sys.executable, str(executable)]
+    return [str(executable)]
 
 
 def read_text_arg(raw: str | None, file_path: str | None) -> str:
@@ -128,20 +136,20 @@ def default_capture_session_id(raw_session_id: str, stdin_payload: dict[str, Any
 def launch_desktop(project_root: str, session_id: str, timeout: float = DEFAULT_CAPTURE_TIMEOUT) -> None:
     log_path = Path(tempfile.gettempdir()) / "codeflow.log"
     executable = codeflow_executable()
-    env = {
-        **os.environ,
-        "CODEFLOW_APP_ROOT": str(repo_root()),
-        "CODEFLOW_PROJECT_ROOT": project_root,
-    }
+    root = repo_root()
+    env = {**os.environ, "CODEFLOW_PROJECT_ROOT": project_root}
+    if root:
+        env["CODEFLOW_APP_ROOT"] = str(root)
     if session_id:
         env["CODEFLOW_SESSION_ID"] = session_id
-    cmd = [str(executable), "--project-root", project_root, "--no-build"]
+    command = executable_command(executable)
+    cmd = [*command, "--project-root", project_root, "--no-build"]
     if session_id:
         cmd.extend(["--session-id", session_id])
     with log_path.open("a", encoding="utf-8") as log:
         subprocess.run(
-            [str(executable), "--project-root", project_root, "--prepare-only"],
-            cwd=str(repo_root()),
+            [*command, "--project-root", project_root, "--prepare-only"],
+            cwd=str(root or Path(project_root)),
             env=env,
             stdout=log,
             stderr=log,
@@ -151,7 +159,7 @@ def launch_desktop(project_root: str, session_id: str, timeout: float = DEFAULT_
         )
         subprocess.Popen(
             cmd,
-            cwd=str(repo_root()),
+            cwd=str(root or Path(project_root)),
             env=env,
             stdout=log,
             stderr=log,

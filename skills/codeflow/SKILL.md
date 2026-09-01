@@ -18,10 +18,14 @@ When the canonical instructions need the capture script, prefer the plugin PATH
 wrapper if it is available:
 
 ```bash
-SCRIPT="$(command -v codeflow-capture || true)"
-[ -n "$SCRIPT" ] || SCRIPT="$HOME/.codex/skills/codeflow/scripts/codeflow_capture.py"
-[ -f "$SCRIPT" ] || SCRIPT="$HOME/.claude/skills/codeflow/scripts/codeflow_capture.py"
+CAPTURE="$(command -v codeflow-capture || true)"
 ```
 
-The `codeflow` app launcher is also exposed through the plugin `bin/` directory
-when the host supports plugin executables on PATH.
+The plugin exposes both `codeflow-capture` and `codeflow` through its `bin/`
+directory. If `codeflow-capture` is not on PATH, follow the standalone fallback
+in the canonical instructions; do not require installed Skill files to retain
+their executable bit.
+
+The capture adapter requires Python 3.10 or newer. It uses only the Python
+standard library; the packaged desktop app already contains its backend and
+does not require a separate Python runtime.

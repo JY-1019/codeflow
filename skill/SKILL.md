@@ -31,6 +31,9 @@ already installed Codeflow app and sends local capture events to it. If
 commit, push, or merge are not part of the user's requested workflow, skip those
 events or record them as skipped; implementation, review, review-fix, and
 verification are enough for normal review-loop tracking.
+The capture adapter requires Python 3.10 or newer and uses only the standard
+library. The packaged app's backend is already bundled, so users do not need to
+install backend Python packages or run `pip install`.
 The session stores:
 
 - `user_prompt`: the user's latest request, shown in the right doc panel when
@@ -59,12 +62,25 @@ not wait for the final response to describe the whole loop. Pick one stable
 After each phase completes, run the capture script with `--event-kind`:
 
 ```bash
-SCRIPT="$(command -v codeflow-capture || true)"
-[ -n "$SCRIPT" ] || SCRIPT="$HOME/.codex/skills/codeflow/scripts/codeflow_capture.py"
-[ -f "$SCRIPT" ] || SCRIPT="$HOME/.claude/skills/codeflow/scripts/codeflow_capture.py"
+CAPTURE="$(command -v codeflow-capture || true)"
+[ -n "$CAPTURE" ] || CAPTURE="$HOME/.codex/skills/codeflow/scripts/codeflow_capture.py"
+[ -f "$CAPTURE" ] || CAPTURE="$HOME/.claude/skills/codeflow/scripts/codeflow_capture.py"
+
+if [[ "$CAPTURE" == *.py ]]; then
+  if command -v python3 >/dev/null 2>&1 && python3 -c 'import sys; raise SystemExit(sys.version_info < (3, 10))'; then
+    CAPTURE_CMD=(python3 "$CAPTURE")
+  elif command -v python >/dev/null 2>&1 && python -c 'import sys; raise SystemExit(sys.version_info < (3, 10))'; then
+    CAPTURE_CMD=(python "$CAPTURE")
+  else
+    echo "Codeflow requires Python 3.10 or newer." >&2
+    exit 1
+  fi
+else
+  CAPTURE_CMD=("$CAPTURE")
+fi
 WORKFLOW_ID="markdown-review-$(date +%Y%m%d%H%M%S)"
 
-python3 "$SCRIPT" --project-root "$PWD" --event-kind markdown <<JSON
+"${CAPTURE_CMD[@]}" --project-root "$PWD" --event-kind markdown <<JSON
 {
   "user_prompt": "<copy the user's latest request>",
   "workflow_id": "$WORKFLOW_ID",
@@ -84,7 +100,7 @@ JSON
 Use the same `workflow_id` and `run_id` for later events in that Markdown file:
 
 ```bash
-python3 "$SCRIPT" --project-root "$PWD" --event-kind implementation <<JSON
+"${CAPTURE_CMD[@]}" --project-root "$PWD" --event-kind implementation <<JSON
 {
   "workflow_id": "$WORKFLOW_ID",
   "run_id": "<stable id for this markdown file>",
@@ -100,7 +116,7 @@ the tool that actually ran the review — for example `codex` when the Codex
 review plugin reviews work that Claude Code implemented:
 
 ```bash
-python3 "$SCRIPT" --project-root "$PWD" --event-kind review <<JSON
+"${CAPTURE_CMD[@]}" --project-root "$PWD" --event-kind review <<JSON
 {
   "workflow_id": "$WORKFLOW_ID",
   "run_id": "<stable id for this markdown file>",
@@ -116,7 +132,7 @@ If review findings are fixed, record a separate `review_fix` event after the
 fix is implemented so the node has its own diff:
 
 ```bash
-python3 "$SCRIPT" --project-root "$PWD" --event-kind review_fix <<JSON
+"${CAPTURE_CMD[@]}" --project-root "$PWD" --event-kind review_fix <<JSON
 {
   "workflow_id": "$WORKFLOW_ID",
   "run_id": "<stable id for this markdown file>",
@@ -166,7 +182,7 @@ work completes:
 
 ```bash
 WORKFLOW_ID="codeflow-general-$(date +%Y%m%d%H%M%S)"
-python3 "$SCRIPT" --project-root "$PWD" --event-kind implementation <<JSON
+"${CAPTURE_CMD[@]}" --project-root "$PWD" --event-kind implementation <<JSON
 {
   "workflow_id": "$WORKFLOW_ID",
   "run_id": "ad-hoc",
@@ -178,6 +194,22 @@ python3 "$SCRIPT" --project-root "$PWD" --event-kind implementation <<JSON
 }
 JSON
 ```
+
+Repeat the capture-command resolution at the start of each separate shell
+invocation; shell variables do not carry across tool calls.
+
+The examples above use a POSIX shell. On Windows PowerShell, invoke the same
+installed script with the Python launcher instead:
+
+```powershell
+'{"workflow_id":"<id>","run_id":"<id>","step_summary":"<요약>"}' |
+  py -3 "$env:USERPROFILE\.codex\skills\codeflow\scripts\codeflow_capture.py" `
+    --project-root "$PWD" --event-kind implementation
+```
+
+Use `python` instead of `py -3` when that is the available Python 3.10+
+command. Marketplace-installed Claude plugins use the `codeflow-capture`
+command from the plugin's Bash PATH.
 
 This records ad-hoc work as a normal session run, so the desktop app shows what
 was done and which tool did it even without a fixed Markdown Branch format.

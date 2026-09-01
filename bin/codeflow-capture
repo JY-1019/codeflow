@@ -1,10 +1,18 @@
-#!/usr/bin/env python3
-from __future__ import annotations
+#!/usr/bin/env bash
+set -euo pipefail
 
-import os
-import sys
-from pathlib import Path
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT="$SCRIPT_DIR/../skill/scripts/codeflow_capture.py"
 
+if command -v python3 >/dev/null 2>&1 && python3 -c 'import sys; raise SystemExit(sys.version_info < (3, 10))'; then
+  exec python3 "$SCRIPT" "$@"
+fi
+if command -v python >/dev/null 2>&1 && python -c 'import sys; raise SystemExit(sys.version_info < (3, 10))'; then
+  exec python "$SCRIPT" "$@"
+fi
+if command -v py >/dev/null 2>&1 && py -3 -c 'import sys; raise SystemExit(sys.version_info < (3, 10))'; then
+  exec py -3 "$SCRIPT" "$@"
+fi
 
-script = Path(__file__).resolve().parents[1] / "skill" / "scripts" / "codeflow_capture.py"
-os.execv(sys.executable, [sys.executable, str(script), *sys.argv[1:]])
+echo "Codeflow requires Python 3.10 or newer for its Codex/Claude adapter." >&2
+exit 1
