@@ -51,14 +51,14 @@ Install Python 3.10 or newer before continuing if neither command works.
 
 #### Windows (x64)
 
-1. [Download the Windows portable EXE](Codeflow-0.1.0-x64.exe?raw=1).
+1. [Download the Windows portable EXE](Codeflow-0.2.0-x64.exe?raw=1).
 2. Move it to a permanent location and register that path in PowerShell:
 
 ```powershell
 $codeflowDir = "$env:LOCALAPPDATA\Codeflow"
 New-Item -ItemType Directory -Force $codeflowDir
-Move-Item "$env:USERPROFILE\Downloads\Codeflow-0.1.0-x64.exe" $codeflowDir
-setx CODEFLOW_APP_EXECUTABLE "$codeflowDir\Codeflow-0.1.0-x64.exe"
+Move-Item "$env:USERPROFILE\Downloads\Codeflow-0.2.0-x64.exe" $codeflowDir
+setx CODEFLOW_APP_EXECUTABLE "$codeflowDir\Codeflow-0.2.0-x64.exe"
 ```
 
 3. Open a new terminal so it sees the environment variable, then run the EXE
