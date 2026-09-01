@@ -11,19 +11,93 @@ The plugin does not download or install the desktop app for you. Install it firs
 
 ## Quick Start
 
-### 1. Install The Desktop App
+Codeflow needs both the desktop app and this repository's adapter. Complete
+these steps once, then invoke Codeflow from any coding task you want to record.
 
-1. Until a renamed release is published, build the macOS DMG with `cd frontend && npm ci && npm run dist:mac`.
-2. Open `frontend/release/Codeflow-<version>-<arch>.dmg` and drag `Codeflow.app` into `/Applications`.
-3. Launch the app once. If macOS blocks it, control-click the app in Finder and choose `Open`.
+### 1. Clone The Adapter
 
-If a Windows portable EXE is provided as a release asset, set the executable path so the plugin can launch it:
-
-```powershell
-setx CODEFLOW_APP_EXECUTABLE "C:\path\to\Codeflow-0.1.0-x64.exe"
+```bash
+git clone https://github.com/JY-1019/codeflow.git
+cd codeflow
 ```
 
-### 2. Connect Codex Or Claude Code
+Keep this checkout after setup. Run the remaining repository commands from this
+directory.
+
+### 2. Install The Desktop App
+
+#### macOS (Apple silicon)
+
+1. [Download the macOS DMG](Codeflow-0.1.0-arm64.dmg?raw=1).
+2. Open `Codeflow-0.1.0-arm64.dmg` from your Downloads folder.
+3. Drag `Codeflow.app` into `/Applications`.
+4. Launch Codeflow once. If macOS blocks it, control-click `Codeflow.app` in
+   Finder and choose **Open**.
+
+#### Windows (x64)
+
+1. [Download the Windows portable EXE](Codeflow-0.1.0-x64.exe?raw=1).
+2. Move it to a permanent location and register that path in PowerShell:
+
+```powershell
+$codeflowDir = "$env:LOCALAPPDATA\Codeflow"
+New-Item -ItemType Directory -Force $codeflowDir
+Move-Item "$env:USERPROFILE\Downloads\Codeflow-0.1.0-x64.exe" $codeflowDir
+setx CODEFLOW_APP_EXECUTABLE "$codeflowDir\Codeflow-0.1.0-x64.exe"
+```
+
+3. Open a new terminal so it sees the environment variable, then run the EXE
+   once:
+
+```powershell
+Start-Process $env:CODEFLOW_APP_EXECUTABLE
+```
+
+### 3. Connect Codex
+
+On macOS, link the bundled Skill into your local Codex skills directory:
+
+```bash
+mkdir -p ~/.codex/skills
+ln -sfn "$PWD/skill" ~/.codex/skills/codeflow
+```
+
+On Windows, create a directory junction from PowerShell:
+
+```powershell
+New-Item -ItemType Directory -Force "$env:USERPROFILE\.codex\skills"
+New-Item -ItemType Junction `
+  -Path "$env:USERPROFILE\.codex\skills\codeflow" `
+  -Target (Resolve-Path ".\skill")
+```
+
+Start a new Codex task, then invoke `$codeflow` or include `codeflow` in the
+request.
+
+### 4. Connect Claude Code
+
+Launch Claude Code with the repository loaded as a local plugin:
+
+```bash
+claude --plugin-dir "$PWD"
+```
+
+Pass the same `--plugin-dir` option each time you start Claude Code.
+
+### 5. Verify The Setup
+
+Keep the desktop app running, start a new Codex task or the Claude Code session
+from step 4, and send:
+
+```text
+Open Codeflow and record this test task.
+```
+
+Codeflow should open or focus its window and add the task to **Session Flow**.
+For later work, invoke `$codeflow` in Codex or `/codeflow:codeflow` in Claude
+Code, or simply include `codeflow` in the request.
+
+## Plugin Layout
 
 This repository root is also the plugin root.
 
@@ -33,32 +107,8 @@ This repository root is also the plugin root.
 - Canonical skill instructions: `skill/SKILL.md`
 - Plugin PATH wrappers: `bin/codeflow`, `bin/codeflow-capture`
 
-To validate the Claude Code plugin from a local checkout:
-
-```bash
-claude plugin validate .
-claude --plugin-dir "$PWD" plugin details codeflow
-```
-
-When the plugin is loaded in Claude Code, mention `codeflow` in the task prompt to invoke the plugin skill.
-
-You can also install the legacy Skill layout directly:
-
-```bash
-mkdir -p ~/.codex/skills ~/.claude/skills
-ln -sfn "$PWD/skill" ~/.codex/skills/codeflow
-ln -sfn "$PWD/skill" ~/.claude/skills/codeflow
-```
-
-To validate the Codex plugin manifest locally:
-
-```bash
-python3 ~/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py "$PWD"
-```
-
-### 3. Invoke It During Work
-
-Codeflow is not a background watcher. Add `codeflow` to the task prompt when you want the implementation/review loop recorded.
+Codeflow is not a background watcher. Add `codeflow` to the task prompt when
+you want the implementation/review loop recorded.
 
 Example: Codex implements and Codex `/review` reviews:
 
@@ -163,7 +213,8 @@ cd frontend
 npm run dist:mac
 ```
 
-The DMG is written to `frontend/release/Codeflow-<version>-<arch>.dmg`. Do not commit this file to Git; upload it as a GitHub Release asset.
+The DMG is written to `frontend/release/Codeflow-<version>-<arch>.dmg`. Release
+copies stored in the repository root must be tracked with Git LFS.
 
 Build a Windows portable EXE from a Windows environment:
 
