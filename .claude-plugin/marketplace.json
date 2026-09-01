@@ -4,12 +4,12 @@
     "name": "Codeflow",
     "url": "https://github.com/JY-1019/codeflow"
   },
-  "description": "Codeflow plugins for local implementation and review visualization.",
+  "description": "Codeflow plugins for parallel implementation, review, verification, and local visualization.",
   "plugins": [
     {
       "name": "codeflow",
       "source": "./",
-      "description": "Capture Claude Code and Codex implementation/review loops into the local Codeflow desktop app.",
+      "description": "Orchestrate and capture parallel-first Claude Code and Codex implementation/review loops.",
       "category": "productivity",
       "tags": [
         "codeflow",

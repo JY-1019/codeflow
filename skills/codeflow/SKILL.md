@@ -1,11 +1,13 @@
 ---
 name: codeflow
 description: |
-  Use this skill only when the user explicitly invokes Codeflow, for
-  example with codeflow, /codeflow, or a direct request to open,
-  show, or record Codeflow. It loads the canonical Codeflow capture
-  instructions from this plugin and records implementation/review-loop events
-  into the local desktop app.
+  Never select Codeflow inside `/review`, `codex review`, `/codex:review`, or
+  another dedicated reviewer subtask; return findings directly there.
+  Use Codeflow for repository implementation, review, verification, and Git
+  integration work whether or not the user names Codeflow or uses a special
+  prompt format. It loads the canonical parallel-first orchestration and review
+  loop, records completed phases in the local desktop app, and returns one
+  synthesized report.
 ---
 
 # Codeflow Plugin Entry

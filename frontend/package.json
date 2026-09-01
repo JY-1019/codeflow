@@ -1,18 +1,19 @@
 {
   "name": "codeflow-frontend",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
     "build:backend": "python3 ../scripts/build_backend_binary.py",
+    "build:backend:win": "python ../scripts/build_backend_binary.py",
     "electron": "electron electron/main.cjs",
     "desktop": "npm run build && electron electron/main.cjs",
     "dist": "npm run build:backend && npm run build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder",
     "dist:mac": "npm run build:backend && npm run build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dmg",
-    "dist:win": "npm run build:backend && npm run build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win portable --x64",
+    "dist:win": "npm run build:backend:win && npm run build && electron-builder --win portable --x64",
     "dist:signed": "npm run build && electron-builder",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit"

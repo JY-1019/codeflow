@@ -288,9 +288,6 @@ export function ChangePage() {
               {sessionLabel}
             </span>
           ) : null}
-          <span className="ml-3 rounded bg-slate-800 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-slate-300">
-            Markdown review flow
-          </span>
         </div>
         <div className="flex items-center gap-2 text-[12px]">
           <input

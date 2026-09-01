@@ -1,8 +1,8 @@
 {
   "name": "codeflow",
   "displayName": "Codeflow",
-  "description": "Capture Claude Code and Codex implementation/review loops into the local Codeflow desktop app.",
-  "version": "0.1.0",
+  "description": "Orchestrate and capture parallel-first Claude Code and Codex implementation/review loops.",
+  "version": "0.2.0",
   "author": {
     "name": "Codeflow"
   },

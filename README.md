@@ -5,9 +5,14 @@
 Codeflow has two parts:
 
 - **Desktop app**: a packaged Electron app. It starts a local FastAPI backend and receives workflow events on `127.0.0.1:8019`.
-- **Codex / Claude Code plugin or Skill**: a thin adapter that records implementation, review, review-fix, and verification events while an agent works.
+- **Codex / Claude Code plugin or Skill**: a thin orchestrator that runs and
+  records parallel discovery, implementation, review, review-fix, verification,
+  and authorized Git integration.
 
-The plugin does not download or install the desktop app for you. Install it first, then explicitly invoke `codeflow` in Codex or Claude Code when you want a task to be recorded. Codeflow itself does not call any external LLM API.
+The plugin does not download or install the desktop app for you. Install it
+first. The host can select Codeflow automatically for repository work; invoke
+`$codeflow` or `/codeflow:codeflow` explicitly when you need guaranteed
+activation. Codeflow itself does not call any external LLM API.
 
 ## Quick Start
 
@@ -38,8 +43,8 @@ Install Python 3.10 or newer before continuing if neither command works.
 
 #### macOS (Apple silicon)
 
-1. [Download the macOS DMG](Codeflow-0.1.0-arm64.dmg?raw=1).
-2. Open `Codeflow-0.1.0-arm64.dmg` from your Downloads folder.
+1. [Download the macOS DMG](Codeflow-0.2.0-arm64.dmg?raw=1).
+2. Open `Codeflow-0.2.0-arm64.dmg` from your Downloads folder.
 3. Drag `Codeflow.app` into `/Applications`.
 4. Launch Codeflow once. If macOS blocks it, control-click `Codeflow.app` in
    Finder and choose **Open**.
@@ -103,8 +108,9 @@ Open Codeflow and record this test task.
 ```
 
 Codeflow should open or focus its window and add the task to **Session Flow**.
-For later work, invoke `$codeflow` in Codex or `/codeflow:codeflow` in Claude
-Code, or simply include `codeflow` in the request.
+For later repository work, the host may select Codeflow from the request's
+meaning. Invoke `$codeflow` in Codex or `/codeflow:codeflow` in Claude Code when
+automatic Skill routing does not select it.
 
 ## Plugin Layout
 
@@ -117,22 +123,79 @@ This repository root is also the plugin root.
 - Canonical skill instructions: `skill/SKILL.md`
 - Plugin PATH wrappers: `bin/codeflow`, `bin/codeflow-capture`
 
-Codeflow is not a background watcher. Add `codeflow` to the task prompt when
-you want the implementation/review loop recorded.
+Codeflow is not a background filesystem watcher. Once the host selects the
+Skill, the prompt's wording does not change the required workflow.
+
+## Default Workflow
+
+Before editing, Codeflow partitions the request into independent units and runs
+read-only discovery in parallel when the host supports it. Non-overlapping
+implementation work runs in parallel only inside explicitly authorized Git
+worktrees; other writes remain serialized.
+
+Every changed unit must complete this loop:
+
+```text
+implementation -> review -> review_fix (if needed) -> review -> verification
+```
+
+Review and verification repeat until there are no actionable findings and the
+focused checks pass, or the task reaches a genuine blocker.
+
+When Codeflow owns execution policy, implementation workers use a current,
+slightly leaner model when the host can select one:
+
+- Codex: latest `terra`, currently `gpt-5.6-terra`, medium effort
+- Claude Code: latest `sonnet` alias, currently Claude Sonnet 5 on the Anthropic
+  API, medium effort
+
+An explicitly selected, more-specific execution Skill owns its unit, model,
+Git, and review policies; Codeflow adds capture, missing orchestration defaults,
+and final synthesis without overriding that workflow.
+
+Review uses a dedicated reviewer agent, not the implementation agent asking
+itself to review. In Codex, native `/review` (or CLI `codex review`) starts that
+dedicated reviewer. In an automatic Claude Code loop, Codeflow runs the
+model-callable `codex review --uncommitted` CLI for working-tree changes (or an
+explicit `--base`/`--commit` target); `/codex:review --wait` reaches the same
+shared reviewer when you invoke it directly, but Skills cannot invoke that
+user-only slash command. A generic Codex prompt or `codex exec` does not count.
+If the Codex reviewer is unavailable, a separate Claude reviewer context handles
+the fallback. Before editing, Codeflow snapshots the unit's planned write paths;
+the reviewer is limited to the resulting unit patch and never treats unrelated
+pre-existing working-tree changes as findings or fix targets. The actual
+reviewer is always recorded.
+
+Codeflow changes Git state only when the user explicitly asks to commit, push,
+merge, or reflect work into a branch. New implementation work uses one isolated
+branch and worktree per independent unit, then serializes integration and push.
+A request that only commits, pushes, or merges an existing named state stays on
+that state instead of creating replacement work. Without Git authorization,
+Codeflow does not create branches, worktrees, commits, or remote changes.
+Conflict resolution, commit hooks, or remote integration that changes files
+opens a new integration unit and repeats review and verification before push.
+Codeflow opens the session window on the canonical repository, keeps each
+worker run on one worktree path, and returns the session to the canonical path
+before temporary worktrees are removed.
+
+The coordinator waits for all parallel units and returns one synthesized report
+covering the outcome, review fixes, verification, Git result, model fallbacks,
+blockers, and remaining risks.
 
 Example: Codex implements and Codex `/review` reviews:
 
 ```text
 Use codeflow to record this implementation and review loop.
-After implementing, run Codex review as the quality gate, fix actionable findings, and review again.
+After implementing, run native /review so Codex's dedicated reviewer is the quality gate.
+Fix actionable findings, then run native /review again.
 Record verification as well. Do not commit or push.
 ```
 
-Example: Claude Code implements and the Codex review plugin reviews:
+Example: Claude Code implements and prefers Codex review:
 
 ```text
 Use codeflow to implement this change and record the workflow.
-Mark the implementation phase as Claude Code and the review phase as the Codex review plugin.
+Let Codeflow snapshot the implementation unit, then run codex review --uncommitted with review scope limited to that resulting unit patch. Use /codex:review --wait only when invoking review yourself.
 Fix review findings, review again, and record verification. Skip commit and push.
 ```
 
@@ -142,6 +205,8 @@ Longer copy-paste prompts are available in [`prompts/`](prompts/).
 
 The primary recording unit is a `POST /api/sessions/event` event.
 
+- `preflight`: dependency analysis, reviewer availability, and parallel lanes
+- `branch`: an authorized worktree and work branch created successfully
 - `implementation`: the implementation step and its diff
 - `review`: the review result summary, including no-finding reviews
 - `review_fix`: the step that addresses review findings and its diff
@@ -155,7 +220,11 @@ Each step can include an `agent` value.
 - Claude Code implementation -> Claude Code review: `claude-code` -> `claude-code`
 - Codex implementation -> Claude Code review: `codex` -> `claude-code`
 
-Events with the same `session_id`, `workflow_id`, and `run_id` are grouped into one traceable run. Set `CODEFLOW_SESSION_ID` to the same value on both sides of a cross-tool handoff. The UI shows a small agent badge on every workflow step, including `branch`, `commit`, `push`, and `merge` events.
+Events with the same `session_id` and `workflow_id` belong to one user request;
+each parallel unit uses its own stable `run_id`. Codeflow reuses the host
+conversation ID when available and passes that value as `CODEFLOW_SESSION_ID`
+across parallel lanes and cross-tool handoffs. The UI shows a small agent badge
+on every workflow step, including `branch`, `commit`, `push`, and `merge` events.
 
 ## How It Works
 

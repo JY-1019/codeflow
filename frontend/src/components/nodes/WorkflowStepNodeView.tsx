@@ -1,8 +1,10 @@
-import { memo } from "react";
-import { Handle, Position, type NodeProps } from "@xyflow/react";
+import { memo, useLayoutEffect, useRef, useState } from "react";
+import { Handle, NodeToolbar, Position, type NodeProps } from "@xyflow/react";
 import {
   Bot,
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
   CircleDashed,
   ClipboardList,
   Code2,
@@ -35,6 +37,18 @@ export const WorkflowStepNodeView = memo(({ data, selected }: NodeProps) => {
   const StatusIcon = statusIcon(step.status);
   const StepIcon = phase.icon;
   const agentLabel = agentDisplayLabel(step.agent, step.agent_label);
+  const summaryRef = useRef<HTMLDivElement>(null);
+  const [summaryExpanded, setSummaryExpanded] = useState(false);
+  const [summaryOverflows, setSummaryOverflows] = useState(false);
+
+  useLayoutEffect(() => {
+    const summary = summaryRef.current;
+    if (!summary) return;
+    const collapsedHeight = Math.ceil(Number.parseFloat(getComputedStyle(summary).lineHeight) * 3);
+    const overflows = summary.scrollHeight > collapsedHeight;
+    setSummaryOverflows(overflows);
+    if (!overflows) setSummaryExpanded(false);
+  }, [step.summary]);
 
   return (
     <div
@@ -42,6 +56,21 @@ export const WorkflowStepNodeView = memo(({ data, selected }: NodeProps) => {
         selected ? `${phase.selectedBorder} ring-2 ${phase.ring}` : phase.border
       }`}
     >
+      <NodeToolbar
+        isVisible={summaryExpanded}
+        position={Position.Bottom}
+        align="start"
+        offset={8}
+        className="nopan nokey w-[228px] rounded-md border border-cyan-400/60 bg-slate-900 p-3 shadow-xl"
+      >
+        <div
+          className="nowheel nopan nokey max-h-48 overflow-y-auto whitespace-pre-wrap break-all text-[12px] leading-snug text-slate-200"
+          tabIndex={0}
+          aria-label="Expanded summary"
+        >
+          {step.summary}
+        </div>
+      </NodeToolbar>
       <Handle
         type="target"
         position={Position.Left}
@@ -77,9 +106,27 @@ export const WorkflowStepNodeView = memo(({ data, selected }: NodeProps) => {
         <div className="mb-1 truncate text-[12px] font-semibold text-slate-100" title={step.label}>
           {step.label}
         </div>
-        <div className="line-clamp-3 min-h-[48px] text-[12px] leading-snug text-slate-200">
+        <div
+          ref={summaryRef}
+          className="line-clamp-3 min-h-[48px] break-all text-[12px] leading-snug text-slate-200"
+        >
           {step.summary || "No work has been recorded for this step yet."}
         </div>
+        {summaryOverflows ? (
+          <button
+            type="button"
+            className="nodrag nopan nokey mt-1 inline-flex items-center gap-1 text-[10px] font-medium text-cyan-300 hover:text-cyan-200"
+            aria-expanded={summaryExpanded}
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.stopPropagation();
+              setSummaryExpanded((open) => !open);
+            }}
+          >
+            {summaryExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+            {summaryExpanded ? "Show less" : "Show more"}
+          </button>
+        ) : null}
         {step.branchName || step.markdownPath ? (
           <div className="mt-2 flex min-w-0 gap-1">
             {step.branchName ? (
