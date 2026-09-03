@@ -1,6 +1,29 @@
-# Codeflow
+<p align="center">
+  <img src="docs/assets/codeflow-icon.png" alt="Codeflow icon" width="112" />
+</p>
 
-**A local desktop visualizer for Codex and Claude Code implementation -> review -> review-fix -> verification loops.**
+<h1 align="center">Codeflow</h1>
+
+<p align="center">
+  See your coding agent's work—from prompt to verified change.
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/macOS-Apple%20silicon-000000?logo=apple&logoColor=white" alt="macOS Apple silicon" />
+  <img src="https://img.shields.io/badge/Windows-x64-0078D4?logo=windows&logoColor=white" alt="Windows x64" />
+  <img src="https://img.shields.io/badge/local--first-127.0.0.1-2E7D32" alt="Local-first" />
+</p>
+
+Codeflow is a local desktop companion for Codex and Claude Code. It turns an
+agent task into a clear **Session Flow**: what was requested, what changed,
+what review found, and how the work was verified.
+
+![Codeflow Session Flow](docs/assets/codeflow-session-flow.png)
+
+Instead of reconstructing an implementation from terminal output and chat
+history, open Codeflow to follow the work at a glance. The app runs a local
+backend on `127.0.0.1`; the adapter records the workflow without calling an
+external LLM API.
 
 Codeflow has two parts:
 
@@ -13,6 +36,36 @@ The plugin does not download or install the desktop app for you. Install it
 first. The host can select Codeflow automatically for repository work; invoke
 `$codeflow` or `/codeflow:codeflow` explicitly when you need guaranteed
 activation. Codeflow itself does not call any external LLM API.
+
+## Interface Tour
+
+The main Session Flow view keeps the task context, workflow, and selected-step
+details visible together:
+
+- **Top**: session/project controls and refresh sit above the usage strip;
+  counters and the status rail summarize the current run.
+- **Left**: task groups and their workflow items let you switch between
+  requests.
+- **Center**: the workflow graph shows the sequence from command through
+  implementation, review, fixes, and verification.
+- **Right**: the context panel changes with the selected node, showing the
+  prompt, summaries, review status, or file diff.
+- **Bottom**: the legend identifies node types, while the minimap and zoom
+  controls make larger flows easy to navigate.
+
+### Review details
+
+![Selected review node](docs/assets/codeflow-review-detail.png)
+
+Select a review node to see its reviewer, completion status, and review summary
+without leaving the workflow.
+
+### Change details
+
+![Selected implementation node with diff](docs/assets/codeflow-change-detail.png)
+
+Select an implementation or review-fix node to inspect the scoped files and
+raw added/removed lines captured for that step.
 
 ## Quick Start
 
