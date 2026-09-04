@@ -19,6 +19,10 @@ ChangeSource = Literal["working", "staged", "range", "branch"]
 
 MAX_PATCH_CHARS = 1_000_000
 MAX_FILE_CONTENT_CHARS = 40_000
+# Bytes sniffed to decide whether an untracked file is binary.
+BINARY_SNIFF_BYTES = 8_000
+# Untracked paths listed inline before an aggregated warning switches to a count.
+MAX_WARNING_SAMPLES = 3
 
 
 @dataclass
@@ -294,14 +298,16 @@ def collect_diff(
         except Exception:
             untracked = []
         existing_paths = {f.path for f in files}
+        notices: dict[str, list[str]] = {}
         for path in untracked:
             path = path.strip()
             if not path or path in existing_paths:
                 continue
-            file_change, warning = _untracked_file_change(root, path)
+            file_change, notice = _untracked_file_change(root, path)
             files.append(file_change)
-            if warning:
-                warnings.append(warning)
+            if notice:
+                notices.setdefault(notice, []).append(path)
+        warnings.extend(_untracked_warnings(notices))
 
     return GitDiffResult(
         source=source,
@@ -315,6 +321,12 @@ def collect_diff(
 
 
 def _untracked_file_change(root: Path, path: str) -> tuple[FileChange, str]:
+    """Build a FileChange for one untracked file.
+
+    Returns the change plus a notice key. collect_diff aggregates the keys so a
+    worktree full of untracked files produces one warning line per category
+    instead of one per file.
+    """
     file_change = FileChange(
         path=path,
         status="added",
@@ -324,37 +336,32 @@ def _untracked_file_change(root: Path, path: str) -> tuple[FileChange, str]:
     try:
         file_stat = file_path.lstat()
     except OSError:
-        return file_change, f"could not stat untracked file: {path}"
+        return file_change, "unstat"
 
     if file_path.is_symlink():
-        display = "symlink target omitted"
-        file_change.hunks.append(
-            DiffHunk(
-                old_start=0,
-                old_lines=0,
-                new_start=1,
-                new_lines=1,
-                added_lines=[(1, display)],
-                lines=[
-                    DiffLine(kind="added", old_line=None, new_line=1, text=display),
-                ],
-            )
-        )
-        return file_change, f"untracked symlink skipped without reading target: {path}"
+        _add_placeholder_hunk(file_change, "symlink target omitted")
+        return file_change, "symlink"
 
     if not stat.S_ISREG(file_stat.st_mode):
         return file_change, ""
 
-    warning = ""
-    read_limit = MAX_FILE_CONTENT_CHARS + 1
+    # Read at most four bytes per allowed character so truncation can be
+    # detected without pulling a large file into memory.
+    read_limit = (MAX_FILE_CONTENT_CHARS + 1) * 4
     try:
-        with file_path.open(encoding="utf-8", errors="replace") as handle:
-            content = handle.read(read_limit)
+        with file_path.open("rb") as handle:
+            head = handle.read(BINARY_SNIFF_BYTES)
+            if _looks_binary(head):
+                _add_placeholder_hunk(file_change, "binary file content omitted")
+                return file_change, ""
+            raw = head + handle.read(max(0, read_limit - len(head)))
     except Exception:
-        return file_change, f"could not read untracked file: {path}"
+        return file_change, "unread"
 
-    if file_stat.st_size > MAX_FILE_CONTENT_CHARS or len(content) > MAX_FILE_CONTENT_CHARS:
-        warning = f"untracked file {path} truncated at {MAX_FILE_CONTENT_CHARS} chars"
+    content = raw.decode("utf-8", errors="replace")
+    notice = ""
+    if len(content) > MAX_FILE_CONTENT_CHARS:
+        notice = "truncated"
         content = content[:MAX_FILE_CONTENT_CHARS]
 
     lines = content.splitlines()
@@ -373,7 +380,58 @@ def _untracked_file_change(root: Path, path: str) -> tuple[FileChange, str]:
                 ],
             )
         )
-    return file_change, warning
+    return file_change, notice
+
+
+def _add_placeholder_hunk(file_change: FileChange, display: str) -> None:
+    file_change.hunks.append(
+        DiffHunk(
+            old_start=0,
+            old_lines=0,
+            new_start=1,
+            new_lines=1,
+            added_lines=[(1, display)],
+            lines=[DiffLine(kind="added", old_line=None, new_line=1, text=display)],
+        )
+    )
+
+
+def _looks_binary(chunk: bytes) -> bool:
+    if not chunk:
+        return False
+    if b"\x00" in chunk:
+        return True
+    # A multi-byte character can straddle the end of the sniffed chunk, so retry
+    # without the last few bytes before calling the file binary.
+    for trim in range(4):
+        try:
+            chunk[: max(0, len(chunk) - trim)].decode("utf-8")
+            return False
+        except UnicodeDecodeError:
+            continue
+    return True
+
+
+def _untracked_warnings(notices: dict[str, list[str]]) -> list[str]:
+    labels = {
+        "truncated": f"untracked files truncated at {MAX_FILE_CONTENT_CHARS} chars",
+        "unread": "untracked files could not be read",
+        "unstat": "untracked files could not be inspected",
+        "symlink": "untracked symlink skipped without reading target",
+    }
+    warnings: list[str] = []
+    for kind, label in labels.items():
+        paths = notices.get(kind)
+        if not paths:
+            continue
+        warnings.append(f"{len(paths)} {label}: {_sample_paths(paths)}")
+    return warnings
+
+
+def _sample_paths(paths: list[str]) -> str:
+    head = ", ".join(paths[:MAX_WARNING_SAMPLES])
+    remaining = len(paths) - MAX_WARNING_SAMPLES
+    return f"{head} and {remaining} more" if remaining > 0 else head
 
 
 def read_file_content(project_root: str, path: str, max_chars: int = MAX_FILE_CONTENT_CHARS) -> str:
@@ -389,9 +447,14 @@ def read_file_content(project_root: str, path: str, max_chars: int = MAX_FILE_CO
     if file_path.is_symlink() or not stat.S_ISREG(file_stat.st_mode):
         return ""
     try:
-        content = file_path.read_text(encoding="utf-8", errors="replace")
+        with file_path.open("rb") as handle:
+            head = handle.read(BINARY_SNIFF_BYTES)
+            if _looks_binary(head):
+                return ""
+            raw = head + handle.read(max(0, (max_chars + 1) * 4 - len(head)))
     except Exception:
         return ""
+    content = raw.decode("utf-8", errors="replace")
     if len(content) > max_chars:
         return content[:max_chars] + f"\n\n[truncated at {max_chars} chars]"
     return content

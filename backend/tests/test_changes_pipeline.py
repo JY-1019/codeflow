@@ -7,7 +7,11 @@ from pathlib import Path
 import pytest
 
 from app.services.changes import graph_builder
-from app.services.changes.git_diff import GitDiffResult, collect_diff
+from app.services.changes.git_diff import (
+    MAX_FILE_CONTENT_CHARS,
+    GitDiffResult,
+    collect_diff,
+)
 from app.services.changes.graph_builder import _extract_js_imports, build_graph
 from app.services.changes.symbol_extractor import extract_symbols
 
@@ -297,6 +301,73 @@ def test_collect_diff_skips_untracked_symlink_targets(tmp_path: Path):
     assert change.hunks[0].added_lines == [(1, "symlink target omitted")]
     assert "do-not-leak" not in snippets
     assert any("untracked symlink skipped" in warning for warning in diff.warnings)
+
+
+def test_collect_diff_omits_untracked_binary_contents(tmp_path: Path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _run(["git", "init", "-q", "-b", "main"], repo)
+    _run(["git", "config", "user.email", "test@example.com"], repo)
+    _run(["git", "config", "user.name", "Test"], repo)
+    (repo / "README.md").write_text("initial\n", encoding="utf-8")
+    _run(["git", "add", "README.md"], repo)
+    _run(["git", "commit", "-q", "-m", "initial"], repo)
+
+    (repo / "image.png").write_bytes(b"\x89PNG\r\n\x1a\n" + bytes(range(256)) * 400)
+    (repo / "notes.md").write_text("plain text\n", encoding="utf-8")
+
+    diff = collect_diff(str(repo), source="working")
+    binary = next(file for file in diff.files if file.path == "image.png")
+    text = next(file for file in diff.files if file.path == "notes.md")
+
+    assert binary.hunks[0].added_lines == [(1, "binary file content omitted")]
+    assert text.hunks[0].added_lines == [(1, "plain text")]
+    assert diff.warnings == []
+
+
+def test_collect_diff_keeps_utf8_untracked_text(tmp_path: Path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _run(["git", "init", "-q", "-b", "main"], repo)
+    _run(["git", "config", "user.email", "test@example.com"], repo)
+    _run(["git", "config", "user.name", "Test"], repo)
+    (repo / "README.md").write_text("initial\n", encoding="utf-8")
+    _run(["git", "add", "README.md"], repo)
+    _run(["git", "commit", "-q", "-m", "initial"], repo)
+
+    (repo / "notes.txt").write_text("한글 텍스트\n이모지 🚀\n", encoding="utf-8")
+
+    diff = collect_diff(str(repo), source="working")
+    change = next(file for file in diff.files if file.path == "notes.txt")
+
+    assert [line for _, line in change.hunks[0].added_lines] == ["한글 텍스트", "이모지 🚀"]
+    assert diff.warnings == []
+
+
+def test_collect_diff_aggregates_untracked_truncation_warnings(tmp_path: Path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _run(["git", "init", "-q", "-b", "main"], repo)
+    _run(["git", "config", "user.email", "test@example.com"], repo)
+    _run(["git", "config", "user.name", "Test"], repo)
+    (repo / "README.md").write_text("initial\n", encoding="utf-8")
+    _run(["git", "add", "README.md"], repo)
+    _run(["git", "commit", "-q", "-m", "initial"], repo)
+
+    oversized = "filler line\n" * 5_000
+    for index in range(5):
+        (repo / f"big{index}.txt").write_text(oversized, encoding="utf-8")
+
+    diff = collect_diff(str(repo), source="working")
+
+    assert len(diff.warnings) == 1
+    warning = diff.warnings[0]
+    assert warning.startswith(f"5 untracked files truncated at {MAX_FILE_CONTENT_CHARS} chars")
+    assert "and 2 more" in warning
+    for change in diff.files:
+        if change.path.startswith("big"):
+            content = "".join(line for _, line in change.hunks[0].added_lines)
+            assert len(content) <= MAX_FILE_CONTENT_CHARS
 
 
 def test_extract_js_imports_keeps_side_effect_imports_separate():
