@@ -26,7 +26,7 @@ def installed_app_executable() -> Path | None:
             Path(os.environ.get("LOCALAPPDATA", "")) / "Programs" / "Codeflow" / "Codeflow.exe",
             Path(os.environ.get("PROGRAMFILES", "")) / "Codeflow" / "Codeflow.exe",
             Path(os.environ.get("PROGRAMFILES(X86)", "")) / "Codeflow" / "Codeflow.exe",
-            Path.cwd() / "Codeflow-0.2.0-x64.exe",
+            Path.cwd() / "Codeflow-0.2.1-x64.exe",
             Path.cwd() / "Codeflow.exe",
         ]
     else:

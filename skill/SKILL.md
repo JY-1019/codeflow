@@ -483,7 +483,7 @@ Codeflow.app/Contents/Resources/backend-bin/codeflow-backend
 Windows runtime:
 
 ```text
-CODEFLOW_APP_EXECUTABLE=<path to Codeflow-0.2.0-x64.exe>
+CODEFLOW_APP_EXECUTABLE=<path to Codeflow-0.2.1-x64.exe>
 ```
 
 Windows bundled backend path inside the packaged app:
@@ -500,7 +500,7 @@ For Windows portable releases, point the skill at the packaged EXE so the
 plugin can launch it:
 
 ```powershell
-setx CODEFLOW_APP_EXECUTABLE "C:\path\to\Codeflow-0.2.0-x64.exe"
+setx CODEFLOW_APP_EXECUTABLE "C:\path\to\Codeflow-0.2.1-x64.exe"
 ```
 
 Use `CODEFLOW_SESSION_ID` when the caller provides a stable conversation or

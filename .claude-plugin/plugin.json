@@ -2,7 +2,7 @@
   "name": "codeflow",
   "displayName": "Codeflow",
   "description": "Orchestrate and capture parallel-first Claude Code and Codex implementation/review loops.",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "author": {
     "name": "Codeflow"
   },

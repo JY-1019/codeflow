@@ -1,6 +1,6 @@
 {
   "name": "codeflow",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Orchestrate and capture parallel-first Codex and Claude Code implementation/review loops.",
   "author": {
     "name": "Codeflow"

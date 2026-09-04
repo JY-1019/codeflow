@@ -96,22 +96,22 @@ Install Python 3.10 or newer before continuing if neither command works.
 
 #### macOS (Apple silicon)
 
-1. [Download the macOS DMG](Codeflow-0.2.0-arm64.dmg?raw=1).
-2. Open `Codeflow-0.2.0-arm64.dmg` from your Downloads folder.
+1. [Download the macOS DMG](Codeflow-0.2.1-arm64.dmg?raw=1).
+2. Open `Codeflow-0.2.1-arm64.dmg` from your Downloads folder.
 3. Drag `Codeflow.app` into `/Applications`.
 4. Launch Codeflow once. If macOS blocks it, control-click `Codeflow.app` in
    Finder and choose **Open**.
 
 #### Windows (x64)
 
-1. [Download the Windows portable EXE](Codeflow-0.2.0-x64.exe?raw=1).
+1. [Download the Windows portable EXE](Codeflow-0.2.1-x64.exe?raw=1).
 2. Move it to a permanent location and register that path in PowerShell:
 
 ```powershell
 $codeflowDir = "$env:LOCALAPPDATA\Codeflow"
 New-Item -ItemType Directory -Force $codeflowDir
-Move-Item "$env:USERPROFILE\Downloads\Codeflow-0.2.0-x64.exe" $codeflowDir
-setx CODEFLOW_APP_EXECUTABLE "$codeflowDir\Codeflow-0.2.0-x64.exe"
+Move-Item "$env:USERPROFILE\Downloads\Codeflow-0.2.1-x64.exe" $codeflowDir
+setx CODEFLOW_APP_EXECUTABLE "$codeflowDir\Codeflow-0.2.1-x64.exe"
 ```
 
 3. Open a new terminal so it sees the environment variable, then run the EXE

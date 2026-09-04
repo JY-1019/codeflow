@@ -26,6 +26,6 @@ jobs:
         working-directory: frontend
       - uses: actions/upload-artifact@v7
         with:
-          name: Codeflow-0.2.0-windows
-          path: frontend/release/Codeflow-0.2.0-x64.exe
+          name: Codeflow-0.2.1-windows
+          path: frontend/release/Codeflow-0.2.1-x64.exe
           if-no-files-found: error
